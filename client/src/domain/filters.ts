@@ -95,6 +95,17 @@ export interface Facets {
   homeTest: FacetOption<boolean>
 }
 
+/**
+ * Reads a typed price bound. Empty means no bound; thousands separators and
+ * spaces are allowed. Negative or non-numeric text is invalid.
+ */
+export function parsePriceInput(text: string): number | null | 'invalid' {
+  const cleaned = text.replace(/[\s,]/g, '')
+  if (cleaned === '') return null
+  const value = Number(cleaned)
+  return Number.isFinite(value) && value >= 0 ? value : 'invalid'
+}
+
 export function facetOption<V>(value: V, label: string, count: number, selected: boolean): FacetOption<V> {
   return { value, label, count, selected, disabled: count === 0 && !selected }
 }

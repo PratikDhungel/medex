@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { countActiveFilters, DEFAULT_FILTERS, facetOption } from './filters'
+import { countActiveFilters, DEFAULT_FILTERS, facetOption, parsePriceInput } from './filters'
+
+describe('parsePriceInput', () => {
+  it('reads numbers with separators, and empty as no bound', () => {
+    expect(parsePriceInput(' 1,500 ')).toBe(1500)
+    expect(parsePriceInput('99.5')).toBe(99.5)
+    expect(parsePriceInput('0')).toBe(0)
+    expect(parsePriceInput('  ')).toBeNull()
+  })
+
+  it('rejects negative and non-numeric text', () => {
+    expect(parsePriceInput('-5')).toBe('invalid')
+    expect(parsePriceInput('abc')).toBe('invalid')
+    expect(parsePriceInput('1e400')).toBe('invalid')
+  })
+})
 
 describe('facetOption', () => {
   it('disables an option with no results', () => {
