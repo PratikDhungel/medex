@@ -12,7 +12,8 @@ export function SortSelect({ value, onChange }: SortSelectProps) {
   const id = useId()
   return (
     <div className="flex items-center gap-2 text-sm">
-      <label htmlFor={id} className="text-muted-foreground">
+      {/* Visually hidden on the narrowest screens to fit beside the Filters button; still read out */}
+      <label htmlFor={id} className="whitespace-nowrap text-muted-foreground max-[24rem]:sr-only">
         Sort by
       </label>
       <div className="relative">

@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  clearFilters,
   countActiveFilters,
-  DEFAULT_FILTERS,
   toggleParent,
   toggleValue,
   type Facets,
@@ -22,10 +22,19 @@ interface FilterSidebarProps {
   currency: string | null
   categoriesAvailable: boolean
   onChange: (patch: Partial<FilterState>) => void
+  /** The "Filters" heading and "Clear all"; the mobile drawer has its own */
+  showHeader?: boolean
 }
 
 /** Every filter except search and sort, which sit above the results */
-export function FilterSidebar({ facets, state, currency, categoriesAvailable, onChange }: FilterSidebarProps) {
+export function FilterSidebar({
+  facets,
+  state,
+  currency,
+  categoriesAvailable,
+  onChange,
+  showHeader = true,
+}: FilterSidebarProps) {
   const active = countActiveFilters(state)
 
   // Subcategory ids for a top-level category; undefined for a subcategory
@@ -37,21 +46,18 @@ export function FilterSidebar({ facets, state, currency, categoriesAvailable, on
   const citiesOf = (code: string) =>
     facets.locations.find((group) => group.country.value === code)?.cities.map((city) => city.value) ?? []
 
-  const clearAll = () => {
-    const { query, sort, expanded } = state
-    onChange({ ...DEFAULT_FILTERS, query, sort, expanded })
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-accent text-base font-semibold">Filters</h2>
-        {active > 0 && (
-          <Button type="button" variant="link" size="sm" className="h-auto px-1" onClick={clearAll}>
-            Clear all ({active})
-          </Button>
-        )}
-      </div>
+      {showHeader && (
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-accent text-base font-semibold">Filters</h2>
+          {active > 0 && (
+            <Button type="button" variant="link" size="sm" className="h-auto px-1" onClick={() => onChange(clearFilters(state))}>
+              Clear all ({active})
+            </Button>
+          )}
+        </div>
+      )}
 
       <FilterSection title="Service type">
         <FacetCheckboxList

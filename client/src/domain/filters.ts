@@ -109,6 +109,12 @@ export function parsePriceInput(text: string): number | null | 'invalid' {
   return Number.isFinite(value) && value >= 0 ? value : 'invalid'
 }
 
+/** Clears every filter, keeping the search, sort and expanded cards */
+export function clearFilters(state: FilterState): FilterState {
+  const { query, sort, expanded } = state
+  return { ...DEFAULT_FILTERS, query, sort, expanded }
+}
+
 /** Adds or removes a value, keeping the list free of duplicates */
 export function toggleValue<V>(list: readonly V[], value: V, selected: boolean): V[] {
   const rest = list.filter((item) => item !== value)

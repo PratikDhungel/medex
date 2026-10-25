@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countActiveFilters, DEFAULT_FILTERS, facetOption, parsePriceInput, toggleParent, toggleValue } from './filters'
+import { clearFilters, countActiveFilters, DEFAULT_FILTERS, facetOption, parsePriceInput, toggleParent, toggleValue } from './filters'
 
 describe('toggleValue', () => {
   it('adds and removes without duplicates', () => {
@@ -68,5 +68,12 @@ describe('countActiveFilters', () => {
     expect(
       countActiveFilters({ ...DEFAULT_FILTERS, query: 'thyroid', sort: 'rating', page: 3, expanded: [48] }),
     ).toBe(0)
+  })
+})
+
+describe('clearFilters', () => {
+  it('keeps the search, sort and expanded cards', () => {
+    const state = { ...DEFAULT_FILTERS, query: 'x', sort: 'rating' as const, expanded: [3], types: ['lab_test'], page: 4 }
+    expect(clearFilters(state)).toEqual({ ...DEFAULT_FILTERS, query: 'x', sort: 'rating', expanded: [3] })
   })
 })

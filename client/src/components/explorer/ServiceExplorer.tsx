@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react'
+import { FilterDrawer } from '@/components/filters/FilterDrawer'
 import { FilterSidebar, FilterSidebarSkeleton } from '@/components/filters/FilterSidebar'
 import { SearchBox } from '@/components/filters/SearchBox'
 import { SortSelect } from '@/components/filters/SortSelect'
@@ -41,7 +42,7 @@ export function ServiceExplorer() {
 
   const index = useMemo(() => (catalog ? buildIndex(catalog) : null), [catalog])
   const result = useMemo(() => (index ? measuredExplore(index, filters) : null), [index, filters])
-  const ready = status.kind === 'ready' && catalog !== undefined && result !== null
+  const ready = status.kind === 'ready' && catalog !== undefined && index !== null && result !== null
 
   const goToPage = (page: number) => {
     setUrlFilters({ ...filters, page }, 'push')
@@ -52,7 +53,7 @@ export function ServiceExplorer() {
 
   return (
     <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start lg:gap-8">
-      {/* Desktop only for now; phones get a drawer in step 8 */}
+      {/* Large screens; smaller ones get the filter drawer */}
       <aside
         aria-label="Filters"
         className="hidden lg:sticky lg:top-6 lg:block lg:max-h-[calc(100svh-3rem)] lg:overflow-y-auto lg:pr-2 lg:pb-6"
@@ -86,7 +87,15 @@ export function ServiceExplorer() {
                 placeholder="Search services, providers or categories"
               />
             </div>
-            <SortSelect value={filters.sort} onChange={(sort) => update({ sort })} />
+            <div className="flex items-center justify-between gap-3">
+              <FilterDrawer
+                index={index}
+                filters={filters}
+                categoriesAvailable={catalog.categoriesAvailable}
+                onApply={(next) => setUrlFilters(next, 'push')}
+              />
+              <SortSelect value={filters.sort} onChange={(sort) => update({ sort })} />
+            </div>
           </div>
         )}
 
