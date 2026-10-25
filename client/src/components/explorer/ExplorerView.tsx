@@ -1,4 +1,4 @@
-import { CloudOff, RotateCw, SearchX, TriangleAlert, WifiOff } from 'lucide-react'
+import { CloudOff, Info, RotateCw, SearchX, TriangleAlert, WifiOff } from 'lucide-react'
 import { failureMessage } from '@/api/failureMessage'
 import { Button } from '@/components/ui/button'
 import type { Catalog } from '@/domain/catalog'
@@ -15,7 +15,14 @@ const numberFormat = new Intl.NumberFormat('en')
 export interface ExplorerViewProps {
   status: CatalogStatus
   catalog: Catalog | undefined
+  /** Provider cards on the current page */
   groups: ProviderGroup[]
+  /** Matching services and providers across every page */
+  totals: { services: number; providers: number }
+  /** Sorted by price across currencies, so prices are grouped by currency */
+  mixedCurrencies: boolean
+  /** Clears the search and filters; offered when nothing matches */
+  onClearFilters: () => void
   failures: CatalogFailure[]
   retrying: boolean
   onRetry: () => void
@@ -35,14 +42,15 @@ function RetryButton({ retrying, onRetry, variant }: { retrying: boolean; onRetr
   )
 }
 
-function countText(status: CatalogStatus, groups: ProviderGroup[], slow: boolean): string {
+function countText(status: CatalogStatus, totals: ExplorerViewProps['totals'], slow: boolean): string {
   switch (status.kind) {
     case 'loading':
       return slow ? 'Still loading services. This is taking longer than usual.' : 'Loading services…'
     case 'ready': {
-      const services = groups.reduce((sum, group) => sum + group.services.length, 0)
-      return `${numberFormat.format(services)} ${services === 1 ? 'service' : 'services'} from ${groups.length} ${
-        groups.length === 1 ? 'provider' : 'providers'
+      const { services, providers } = totals
+      if (services === 0) return 'No matching services'
+      return `${numberFormat.format(services)} ${services === 1 ? 'service' : 'services'} from ${providers} ${
+        providers === 1 ? 'provider' : 'providers'
       }`
     }
     default:
@@ -51,13 +59,13 @@ function countText(status: CatalogStatus, groups: ProviderGroup[], slow: boolean
 }
 
 export function ExplorerView(props: ExplorerViewProps) {
-  const { status, groups, retrying, onRetry, online, slow } = props
+  const { status, totals, mixedCurrencies, retrying, onRetry, online, slow } = props
 
   return (
     <div className="space-y-4">
       {/* Always mounted so screen readers announce every change in the count */}
       <p role="status" aria-live="polite" className="min-h-6 text-sm text-muted-foreground">
-        {countText(status, groups, slow)}
+        {countText(status, totals, slow)}
       </p>
 
       {!online && status.kind === 'ready' && (
@@ -77,6 +85,16 @@ export function ExplorerView(props: ExplorerViewProps) {
         </div>
       )}
 
+      {status.kind === 'ready' && mixedCurrencies && totals.services > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border bg-muted/50 px-4 py-3 text-sm">
+          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <p>
+            Prices are in different currencies, so they're sorted within each currency. Choose a currency under Price to
+            compare like for like.
+          </p>
+        </div>
+      )}
+
       <ExplorerBody {...props} />
     </div>
   )
@@ -86,6 +104,8 @@ function ExplorerBody({
   status,
   catalog,
   groups,
+  totals,
+  onClearFilters,
   failures,
   retrying,
   onRetry,
@@ -127,6 +147,21 @@ function ExplorerBody({
     }
 
     case 'ready':
+      if (catalog && catalog.services.length > 0 && totals.services === 0) {
+        return (
+          <StatePanel
+            icon={SearchX}
+            title="No services match your search"
+            action={
+              <Button variant="outline" onClick={onClearFilters}>
+                Clear search and filters
+              </Button>
+            }
+          >
+            Try fewer filters or a different search term.
+          </StatePanel>
+        )
+      }
       if (!catalog || groups.length === 0) {
         return (
           <StatePanel icon={SearchX} title="No services available right now">

@@ -15,6 +15,8 @@ export interface PriceRange {
 interface PriceFacetProps {
   currencies: FacetOption<string>[]
   currency: string | null
+  /** Offers "Any currency"; false when the currency was preselected rather than chosen */
+  clearable: boolean
   onCurrencyChange: (currency: string | null) => void
   /** Price range of the matching services in the chosen currency */
   bounds: PriceBounds | null
@@ -27,7 +29,7 @@ interface PriceFacetProps {
  * Prices can't be compared across currencies, so a range only applies once a
  * currency is chosen.
  */
-export function PriceFacet({ currencies, currency, onCurrencyChange, bounds, min, max, onRangeChange }: PriceFacetProps) {
+export function PriceFacet({ currencies, currency, clearable, onCurrencyChange, bounds, min, max, onRangeChange }: PriceFacetProps) {
   const name = useId()
 
   return (
@@ -72,9 +74,11 @@ export function PriceFacet({ currencies, currency, onCurrencyChange, bounds, min
             max={max}
             onRangeChange={onRangeChange}
           />
-          <Button type="button" variant="link" size="sm" className="h-auto px-1" onClick={() => onCurrencyChange(null)}>
-            Any currency
-          </Button>
+          {clearable && (
+            <Button type="button" variant="link" size="sm" className="h-auto px-1" onClick={() => onCurrencyChange(null)}>
+              Any currency
+            </Button>
+          )}
         </>
       )}
     </div>

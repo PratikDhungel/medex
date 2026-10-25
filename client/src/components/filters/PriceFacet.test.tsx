@@ -5,7 +5,7 @@ import { PriceFacet } from './PriceFacet'
 
 const noop = () => {}
 
-const render = (currency: string | null, min: number | null = null, max: number | null = null) =>
+const render = (currency: string | null, min: number | null = null, max: number | null = null, clearable = true) =>
   renderToStaticMarkup(
     <PriceFacet
       currencies={[
@@ -14,6 +14,7 @@ const render = (currency: string | null, min: number | null = null, max: number 
         facetOption('INR', 'INR', 0, currency === 'INR'),
       ]}
       currency={currency}
+      clearable={clearable}
       onCurrencyChange={noop}
       bounds={currency ? { currency, min: 120, max: 45000 } : null}
       min={min}
@@ -37,6 +38,10 @@ describe('PriceFacet', () => {
     expect(html).toContain('placeholder="45,000"')
     expect(html).toContain('Matching services cost THB 120 to THB 45,000.')
     expect(html).toContain('Any currency')
+  })
+
+  it('offers no "Any currency" for a preselected currency', () => {
+    expect(render('THB', null, null, false)).not.toContain('Any currency')
   })
 
   it('fills in the current range', () => {

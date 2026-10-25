@@ -18,6 +18,7 @@ const render = (state: FilterState) =>
     <FilterSidebar
       facets={buildFacets(catalog, state, () => catalog.services)}
       state={state}
+      currency={state.currency}
       categoriesAvailable
       onChange={() => {}}
     />,

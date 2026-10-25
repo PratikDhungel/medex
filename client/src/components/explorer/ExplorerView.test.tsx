@@ -19,6 +19,9 @@ const render = (overrides: Partial<ExplorerViewProps>) =>
       status={{ kind: 'ready', missing: [] }}
       catalog={catalog}
       groups={groups}
+      totals={{ services: catalog.services.length, providers: groups.length }}
+      mixedCurrencies={false}
+      onClearFilters={() => {}}
       failures={[]}
       retrying={false}
       onRetry={() => {}}
@@ -90,5 +93,17 @@ describe('ExplorerView', () => {
     expect(html).toContain('Categories couldn&#x27;t be loaded')
     expect(html).toContain('Try again')
     expect(html).toContain('role="article"')
+  })
+
+  it('offers a way out when nothing matches', () => {
+    const html = render({ groups: [], totals: { services: 0, providers: 0 } })
+    expect(html).toContain('No matching services')
+    expect(html).toContain('No services match your search')
+    expect(html).toContain('Clear search and filters')
+  })
+
+  it('explains a price sort across currencies', () => {
+    expect(render({ mixedCurrencies: true })).toContain('sorted within each currency')
+    expect(render({})).not.toContain('sorted within each currency')
   })
 })

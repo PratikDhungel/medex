@@ -18,6 +18,12 @@ function subscribe(onChange: () => void) {
 
 const getSearch = () => window.location.search
 
+/** The URL for a filter state, keeping params the explorer doesn't own */
+export function filtersHref(state: FilterState): string {
+  const params = serialiseFilters(state, new URLSearchParams(window.location.search)).toString()
+  return `${window.location.pathname}${params ? `?${params}` : ''}${window.location.hash}`
+}
+
 /**
  * The filter state, read from and written to the URL. "push" adds a history
  * entry so Back undoes the change; "replace" doesn't, for changes such as
@@ -28,8 +34,7 @@ export function useUrlFilters(): [FilterState, (next: FilterState, mode: History
   const filters = useMemo(() => parseFilters(new URLSearchParams(search)), [search])
 
   const setFilters = (next: FilterState, mode: HistoryMode) => {
-    const params = serialiseFilters(next, new URLSearchParams(window.location.search)).toString()
-    const url = `${window.location.pathname}${params ? `?${params}` : ''}${window.location.hash}`
+    const url = filtersHref(next)
     if (url === `${window.location.pathname}${window.location.search}${window.location.hash}`) return
     try {
       window.history[mode === 'push' ? 'pushState' : 'replaceState'](window.history.state, '', url)

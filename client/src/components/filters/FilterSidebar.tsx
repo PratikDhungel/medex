@@ -18,12 +18,14 @@ import { ProviderFacet } from './ProviderFacet'
 interface FilterSidebarProps {
   facets: Facets
   state: FilterState
+  /** The chosen currency, or the only one left in the results */
+  currency: string | null
   categoriesAvailable: boolean
   onChange: (patch: Partial<FilterState>) => void
 }
 
 /** Every filter except search and sort, which sit above the results */
-export function FilterSidebar({ facets, state, categoriesAvailable, onChange }: FilterSidebarProps) {
+export function FilterSidebar({ facets, state, currency, categoriesAvailable, onChange }: FilterSidebarProps) {
   const active = countActiveFilters(state)
 
   // Subcategory ids for a top-level category; undefined for a subcategory
@@ -76,13 +78,16 @@ export function FilterSidebar({ facets, state, categoriesAvailable, onChange }: 
       <FilterSection title="Price">
         <PriceFacet
           currencies={facets.currencies}
-          currency={state.currency}
+          currency={currency}
+          // Only a currency the user chose can be cleared
+          clearable={state.currency !== null}
           // A range in one currency means nothing in another
-          onCurrencyChange={(currency) => onChange({ currency, priceMin: null, priceMax: null })}
+          onCurrencyChange={(next) => onChange({ currency: next, priceMin: null, priceMax: null })}
           bounds={facets.price}
           min={state.priceMin}
           max={state.priceMax}
-          onRangeChange={({ min, max }) => onChange({ priceMin: min, priceMax: max })}
+          // Saves a preselected currency along with the range
+          onRangeChange={({ min, max }) => onChange({ currency, priceMin: min, priceMax: max })}
         />
       </FilterSection>
 

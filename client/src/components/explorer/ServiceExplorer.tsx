@@ -1,24 +1,33 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { FilterSidebar, FilterSidebarSkeleton } from '@/components/filters/FilterSidebar'
 import { SearchBox } from '@/components/filters/SearchBox'
 import { SortSelect } from '@/components/filters/SortSelect'
-import { buildFacets } from '@/domain/facets'
-import { toggleValue, type FilterState } from '@/domain/filters'
-import { groupByProvider } from '@/domain/grouping'
+import { buildIndex, explore, type ExploreIndex } from '@/domain/engine'
+import { DEFAULT_FILTERS, toggleValue, type FilterState } from '@/domain/filters'
 import { sanitiseFilters } from '@/domain/urlState'
 import { useCatalog } from '@/hooks/useCatalog'
 import { useElapsed } from '@/hooks/useElapsed'
 import { useOnline } from '@/hooks/useOnline'
-import { useUrlFilters, type HistoryMode } from '@/hooks/useUrlFilters'
+import { filtersHref, useUrlFilters, type HistoryMode } from '@/hooks/useUrlFilters'
 import { ExplorerView } from './ExplorerView'
+import { Pagination } from './Pagination'
 
 /** How long loading may take before we say it's slow */
 const SLOW_AFTER_MS = 3000
+
+/** Runs the engine, timed as "explore" in the browser's performance tools */
+function measuredExplore(index: ExploreIndex, filters: FilterState) {
+  const start = performance.now()
+  const result = explore(index, filters)
+  performance.measure('explore', { start })
+  return result
+}
 
 export function ServiceExplorer() {
   const { status, catalog, failures, retrying, retry } = useCatalog()
   const online = useOnline()
   const slow = useElapsed(status.kind === 'loading', SLOW_AFTER_MS)
+  const resultsHeading = useRef<HTMLHeadingElement>(null)
 
   const [urlFilters, setUrlFilters] = useUrlFilters()
   // Ids from a shared or hand-edited URL are checked against the catalog
@@ -30,13 +39,16 @@ export function ServiceExplorer() {
   const update = (patch: Partial<FilterState>, mode: HistoryMode = 'push') =>
     setUrlFilters({ ...filters, page: 1, ...patch }, mode)
 
-  const groups = useMemo(() => (catalog ? groupByProvider(catalog.services, catalog.providers) : []), [catalog])
-  // Counts over the whole catalog until the filter engine (step 7)
-  const facets = useMemo(
-    () => (catalog ? buildFacets(catalog, filters, () => catalog.services) : null),
-    [catalog, filters],
-  )
-  const ready = status.kind === 'ready' && catalog !== undefined && facets !== null
+  const index = useMemo(() => (catalog ? buildIndex(catalog) : null), [catalog])
+  const result = useMemo(() => (index ? measuredExplore(index, filters) : null), [index, filters])
+  const ready = status.kind === 'ready' && catalog !== undefined && result !== null
+
+  const goToPage = (page: number) => {
+    setUrlFilters({ ...filters, page }, 'push')
+    // Start the new page at the top, with focus there for keyboard and screen-reader users
+    resultsHeading.current?.scrollIntoView({ block: 'start' })
+    resultsHeading.current?.focus({ preventScroll: true })
+  }
 
   return (
     <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -47,8 +59,9 @@ export function ServiceExplorer() {
       >
         {ready ? (
           <FilterSidebar
-            facets={facets}
+            facets={result.facets}
             state={filters}
+            currency={result.currency}
             categoriesAvailable={catalog.categoriesAvailable}
             onChange={update}
           />
@@ -58,6 +71,10 @@ export function ServiceExplorer() {
       </aside>
 
       <div className="min-w-0 space-y-4">
+        <h2 ref={resultsHeading} tabIndex={-1} className="sr-only scroll-mt-6">
+          Results
+        </h2>
+
         {ready && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex-1">
@@ -76,7 +93,10 @@ export function ServiceExplorer() {
         <ExplorerView
           status={status}
           catalog={catalog}
-          groups={groups}
+          groups={result?.groups ?? []}
+          totals={{ services: result?.totalServices ?? 0, providers: result?.totalProviders ?? 0 }}
+          mixedCurrencies={result?.mixedCurrencies ?? false}
+          onClearFilters={() => update({ ...DEFAULT_FILTERS, sort: filters.sort })}
           failures={failures}
           retrying={retrying}
           onRetry={retry}
@@ -88,6 +108,15 @@ export function ServiceExplorer() {
             setUrlFilters({ ...filters, expanded: toggleValue(filters.expanded, providerId, expanded) }, 'replace')
           }
         />
+
+        {ready && (
+          <Pagination
+            page={result.page}
+            pageCount={result.pageCount}
+            hrefFor={(page) => filtersHref({ ...filters, page })}
+            onPageChange={goToPage}
+          />
+        )}
       </div>
     </div>
   )
