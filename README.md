@@ -1,11 +1,11 @@
-# medex
+# medex: Service Explorer (Task 1)
 
-Full-stack app with a React frontend and a Node.js/Express backend. The two live side by side as independent projects, each with its own `package.json` and `node_modules`.
+Browse and filter the MedEx service catalogue: 3,200 services from 67 providers, grouped into provider cards. Filter counts update live, prices never mix currencies, and the whole view lives in the URL.
 
 ```
 medex/
-├── client/   # React + TypeScript + Vite, Tailwind CSS, shadcn/ui
-└── server/   # Node.js + Express API (TypeScript); JSON data in server/data/
+├── client/   # React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, Vitest
+└── server/   # Express 5 + TypeScript mock API; data in server/data/task1-service-explorer.json
 ```
 
 ## Getting started
@@ -14,12 +14,10 @@ Requires Node.js 20 or newer. From the repo root:
 
 ```bash
 npm install    # installs root tooling, then server/ and client/ dependencies
-npm run dev    # starts the server (http://localhost:3001) and client (http://localhost:5173)
+npm run dev    # starts the API (http://localhost:3001) and the app (http://localhost:5173)
 ```
 
-Open http://localhost:5173. The Vite dev server proxies `/api/*` requests to the Express server, so no CORS setup is needed in development.
-
-The root `package.json` only holds scripts; it is not an npm workspace. Each app keeps its own dependencies and can still be run on its own from its folder.
+Open http://localhost:5173. Vite proxies `/api/*` to the Express server.
 
 | Root script     | What it does                                  |
 | --------------- | --------------------------------------------- |
@@ -28,11 +26,221 @@ The root `package.json` only holds scripts; it is not an npm workspace. Each app
 | `npm run lint`  | Lint the client                               |
 | `npm test`      | Run client unit tests (Vitest)                |
 
-See [client/README.md](client/README.md) and [server/README.md](server/README.md) for more detail.
+The root `package.json` only holds scripts; it is not an npm workspace. See [client/README.md](client/README.md) and [server/README.md](server/README.md) for each app on its own.
+
+### Trying the loading and error states
+
+The mock API is slow or fails on demand. Add these to the app's URL; the client forwards them to every API request:
+
+| URL                                    | Shows                                                              |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `/?mockDelay=5000`                     | Skeletons, then "taking longer than usual" after 3 s               |
+| `/?mockFail=services`                  | Full error with **Try again** (also `providers` or `all`)          |
+| `/?mockFail=categories`                | Partial data: results with a notice, category filter disabled      |
+| `/?mockFailRate=0.5`                   | Random failures, retried automatically                             |
+| DevTools → Network → Offline           | Offline state before loading; an offline banner after loading      |
+
+## What the brief asked for, and where it stands
+
+✅ done · ◑ done with a caveat · ✗ not done
+
+| Requirement | Status | Notes |
+| --- | --- | --- |
+| Services grouped by provider; at most 3 per card plus "View all N services" | ✅ | N reflects the active filters. "View all" expands the card in place ("Show fewer" to fold it); expanded cards are kept in the URL. |
+| Filters: type, category → subcategory, provider (searchable), city/country, price range, home test | ✅ | Price range applies per currency, see [Prices and currencies](#prices-and-currencies). |
+| Free-text search over title, provider and category | ✅ | Every word must match; case and accents are ignored. |
+| Live facet counts; zero-result options hidden or disabled | ✅ | Disabled, see [Facet counts](#facet-counts). |
+| Final price = after discount + service charge; round only for display; strike through the original | ✅ | |
+| Wellness services priced by duration | ✅ | Shown as "From" the cheapest duration, e.g. "3 durations, 30–120 min". |
+| Never mix or convert currencies | ✅ | |
+| Visibility: service active, provider active, category active | ✅ | 2,853 of 3,200 services are visible. |
+| Sorts: relevance, price low → high, price high → low, rating | ✅ | Relevance is defined in [Sorting](#sorting). |
+| URL is the source of truth (filters, sort, page), including reload, sharing and Back/Forward | ✅ | |
+| Mobile: filters in a drawer whose "Show N results" counts the pending selection | ✅ | |
+| Filter updates within ~100 ms, typing never blocks, no layout shift | ✅ | Measured, see [Performance](#performance). |
+| States: skeleton, empty results with a way out, API failure with retry, mock API that fails on demand | ✅ | |
+| States: partial data, slow, offline | ✅ | |
+| Accessibility: full keyboard use, result count announced | ◑ | Built in and checked in code and headless browsers; not yet walked through with a real screen reader. See [What was left out](#what-was-left-out). |
+| README, tests for the key logic | ✅ | 188 tests, see [Tests](#tests). |
+| Facet counts stay correct with several filters active | ✅ | Tested against brute force on the real data. |
+| Two top-level categories share the slug `ultrasound` | ✅ | Categories are keyed by id and grouped by type. |
+| Handle the data's mistakes | ✅ | See [Known data issues](#known-data-issues). |
+
+## Decisions and trade-offs
+
+### How the app is put together
+
+- **The server stays simple.** It returns the JSON as is from three endpoints that mirror the MedEx API (`/api/category/active`, `/api/providers`, `/api/service`), with latency and failure switches. All filtering happens in the browser: with 3,200 services that takes a few milliseconds, and live facet counts need the whole set anyway. With a much larger catalogue, filtering and counting would move to the server.
+- **One normalisation layer** (`client/src/domain/catalog.ts`) turns the raw API shapes into clean domain types once:
+  - It parses money strictly and applies the visibility rules.
+  - It tidies text and records every data problem in an `issues` list instead of throwing.
+  - Everything after it works with clean data.
+- **Pure functions do the work**, so they are easy to test: pricing, categories, facets, the filter engine, and the URL format. React components only display results and send changes back.
+- **TanStack Query** fetches the three resources separately:
+  - It retries server and network errors twice, but never retries a malformed response.
+  - It pauses while offline.
+  - The three query states combine into one page status: loading, offline, error or ready (possibly with missing categories).
+
+### Prices and currencies
+
+- **Formula.** `final = (price − discount) + service charge`. Discounts and charges are each a percentage or a fixed amount. A percentage service charge is taken on the discounted price. All maths stays unrounded; `formatMoney` is the only place that rounds, using `Intl.NumberFormat` per currency.
+- **Strike-through.** The original is only struck through when the final price is actually lower; 31 prices have a service charge that cancels the discount.
+- **No price.** A missing or unusable price shows **Price on request**. It goes last in price sorts and is excluded by a price range.
+- **The currency belongs to the provider** (THB, NPR, INR) and is never converted. The price filter therefore starts with a currency choice:
+  - The min/max range only appears once a currency is chosen. A range in one currency means nothing in another.
+  - When the current results have only one currency left (for example, after choosing Nepal), it is preselected. It is not written to the URL until a range is set.
+  - Changing currency clears the range.
+- **Price sort across currencies** groups results by currency, then by price, and shows a notice suggesting a currency is chosen to compare like for like.
+- **Wellness services** sort and filter by their cheapest duration (the "From" price).
+
+### Facet counts
+
+- **Each option shows the results you would get by ticking it, given every other active filter.** The engine works this out in one pass over the services: a service that fails only one facet's filter still counts towards that facet. The currency facet also ignores the price range, which is cleared whenever the currency changes.
+- **Options with zero results are disabled, not hidden.** The filter layout stays stable as you click, you can see what exists but is ruled out by other choices, and a selected option always stays enabled so it can be cleared.
+- **Within one facet, choices combine with OR; across facets, with AND.** Country and city form one location facet: a service matches if its country or its city is selected.
+- **Selecting a parent covers its children.** A selected category includes its subcategories, and a selected country includes its cities. The children show as checked and locked, and any of them selected before are dropped. A partly selected parent shows as indeterminate.
+
+### Categories and the duplicate `ultrasound` slug
+
+- Two top-level categories share the slug `ultrasound` (one for packages, one for lab tests), and three subcategories share `thyroid`. Categories are therefore matched and stored by **id**, never by slug.
+- The filter tree groups top-level categories under their service type, so the two "Ultrasound" entries read as Packages › Ultrasound and Lab Tests › Ultrasound.
+- **Trade-off:** category ids make the URL less readable than slugs would (`?category=<id>`). Readable `type:slug` keys would work too but need a lookup in both directions; ids were chosen for simplicity.
+
+### URL state
+
+Every filter, the search, sort, page and expanded cards live in the query string, so a view can be reloaded, shared or walked through with Back. For example:
+
+```
+?q=thyroid&type=lab_test&country=TH&currency=THB&min=500&max=2000&home=1&sort=price-asc&page=2
+```
+
+- **The URL stays short.** Defaults are left out, lists are comma-separated, and other parameters (such as the `mock*` flags) are kept.
+- **History follows intent:**
+  - A filter, sort or page change adds a history entry.
+  - Typing a search adds one entry for the first character, then updates it in place.
+  - Expanding a card updates the URL in place, so Back doesn't fold cards one by one.
+- **A hand-edited or stale URL never breaks the page:**
+  - Malformed values fall back to defaults.
+  - Unknown types, categories, providers, places and currencies are dropped, and a reversed price range is swapped.
+  - An out-of-range page shows the last page.
+- **Pagination links are real `<a href>` links,** so a page can be opened in a new tab.
+
+### Sorting
+
+| Sort | Order |
+| --- | --- |
+| Most relevant, with a search | Matches in a title word first, then elsewhere in the title, then the category, then the provider name. Ties go to the better-reviewed provider. |
+| Most relevant, no search | Providers by a review-weighted rating, which pulls ratings with few reviews towards the average (a rating needs about 25 reviews to count at face value). So 5.0 from 2 reviews doesn't outrank 4.7 from 1,200. |
+| Price | By final price (the "From" price for wellness). Price on request goes last. Grouped by currency when currencies are mixed. |
+| Top rated | Provider rating, then number of reviews. Unrated providers go last. |
+
+Provider cards follow their best service in that order, and services within a card keep it too. Pages hold 10 provider cards.
+
+### States
+
+- **Loading:** skeletons shaped like the real cards and sidebar. After 3 seconds a line says it's taking longer than usual.
+- **Error:** a full error with **Try again** when services or providers fail. The message depends on the cause (offline, network, server, or a response we couldn't read).
+- **Partial data:** if only categories fail, results still show, with a notice, a retry button and the category filter disabled. Accepted risk: until categories load, the 41 services in the inactive "Seasonal Offers" category can't be hidden.
+- **Offline:** before loading, an offline panel that loads automatically when the connection returns. After loading, a banner, and browsing continues.
+- **Empty results:** "No services match your search" with a **Clear search and filters** button.
+
+### Mobile
+
+- Below 1024 px the sidebar becomes a **Filters** button that shows how many filters are applied and opens a drawer.
+- **The drawer works on a draft.** Counts and the **Show N results** button update as you tick, while the results behind stay put.
+- **Show N results** applies everything as one history entry. Closing the drawer any other way discards the draft. With no matches, the button is disabled and **Clear all** sits next to it.
+
+### Accessibility
+
+- **Native controls.** Checkboxes, radio buttons, selects and links are all native elements. Filter groups are `fieldset`/`legend`, and the tree toggles use `aria-expanded` and `aria-controls`.
+- **Announcements.** The result count is announced in a polite live region on every change, and the drawer announces its pending count. Price range errors are linked to their fields and announced.
+- **Keyboard:**
+  - The drawer traps focus, closes with Escape and returns focus to its button.
+  - Changing page moves focus to the top of the results.
+- **Contrast.** The brand orange was darkened so all text meets WCAG AA. White on the button gradient was 2.3 : 1 and is now at least 4.5 : 1. The values are recorded in `client/src/index.css`.
+
+## Performance
+
+**Target:** filter updates within ~100 ms, typing never blocks, no layout shift.
+
+**How it was measured:**
+- The app ran on the dev server, so these are worst-case numbers with React's development build.
+- Headless Microsoft Edge was driven through the Chrome DevTools Protocol, at a 1366 × 900 viewport.
+- **Filter clicks:** each service type was ticked and unticked three times (15 clicks).
+- **Typing:** "blood test" was entered as real key input (10 characters).
+- **Latency** is the time from the input to the next painted frame, taken after two `requestAnimationFrame` callbacks.
+- **Layout shift** was summed from `layout-shift` entries over the load and all interactions.
+- Each run was repeated with the CPU slowed 4×, to stand in for a mid-range phone.
+
+| | Normal CPU | CPU slowed 4× |
+| --- | --- | --- |
+| Filter click → painted (median / worst) | 18 ms / 34 ms | 61 ms / 80 ms |
+| Keystroke → painted (median / worst) | 22 ms / 39 ms | 38 ms / 39 ms |
+| Filter engine alone, per update (median / worst) | 2.5 ms / 6.1 ms | 6.8 ms / 19.5 ms |
+| Cumulative layout shift (load + interactions) | 0.019 | 0.019 |
+
+Everything stays under 100 ms, and layout shift is well under the 0.1 "good" threshold; the small amount happens during the initial load. Typing never waits on anything slow, so no deferral or debouncing was needed.
+
+**What keeps it fast:**
+- The search index (normalised text and provider scores) is built once per load.
+- Each change is one pass over the services that filters, scores and counts every facet at once.
+- Only one page of 10 cards is rendered.
+
+**To check it yourself:** open DevTools → Performance, record while clicking filters, and look for the `explore` measure in the Timings track. Every filter update is recorded there with `performance.measure`. The CPU can be slowed from the same panel.
+
+## Tests
+
+`npm test` runs 188 tests in 24 files (Vitest, Node environment). Most of them run against the real `task1-service-explorer.json`, not just fixtures.
+
+- **Pricing and money:**
+  - discount and charge types
+  - percentage charge on the discounted price
+  - rounding only in display
+  - "Free", "Price on request" and the strike-through rule
+- **Catalog:**
+  - every visibility rule, with the real counts (198 inactive services, 108 from inactive providers, 41 in inactive categories)
+  - duplicate ids, untidy titles, unrated providers, and partial data
+- **Categories:** the duplicate `ultrasound`/`thyroid` slugs, parent and child matching, and the tree grouped by type.
+- **Filter engine:**
+  - every facet option's count checked against "select only this option", with a search, two types, a country and home test all active
+  - plus search, relevance, every sort, currency grouping, paging and the preselected currency
+- **URL state:** parsing, round trips, malformed values, unknown ids, and keeping the `mock*` params.
+- **Fetching:** retry rules, page status from the three queries, and error messages.
+- **Components:** rendered to static HTML and checked for structure and accessibility attributes (cards, states, filters, pagination, drawer trigger).
+
+Interactions (clicking, typing, Back and Forward, the drawer) were checked in headless Edge at 375, 640, 900 and 1366 px. They aren't automated in the repo; see below.
+
+## What was left out
+
+- **Browser tests in the repo.** Component tests render static HTML. Interaction tests (Playwright, or Testing Library with jsdom) would be the next addition.
+- **A screen-reader walkthrough** (VoiceOver/NVDA) and automated axe checks.
+- **Back button closing the mobile drawer.** It goes back a page instead. Fixing it means adding a history entry when the drawer opens.
+- **Touch target size.** The small show/hide toggles in the category and location trees are 28 px, below the 44 px guideline.
+- **Reduced motion.** The drawer's slide animation hasn't been checked against `prefers-reduced-motion`.
+- **Dark mode.** The theme has dark tokens, but the page hasn't been designed or checked in dark mode.
+- **Cleaning the URL on load.** Unknown or invalid params are ignored at once, but only disappear from the address bar at the next change, to avoid adding a history entry the user didn't ask for.
+- **Smarter search.** There's no typo tolerance, stemming or synonyms; relevance is simple word scoring.
+- **Number formatting** is English (`en`) only.
+- **Server-side filtering and pagination**, which a much larger catalogue would need.
+
+## Where AI tools were used
+
+This was built with Claude Code (Anthropic) as a pair programmer, inside VS Code:
+
+- **Analysis and plan:** Claude read the brief and the data and proposed edge cases, open questions and a step-by-step plan. The developer made the product decisions, including:
+  - how "View all" behaves
+  - partial-data handling
+  - category ids in the URL
+  - Title Case labels
+  - the order of the steps
+- **Code and tests:** Claude wrote the code and tests one small step at a time. The developer reviewed each step and made every commit.
+- **Data issues:** Claude found them by querying the JSON. The handling of the bigger ones ("Price on request" for a discount larger than the price, documenting issues for the data owner) was agreed with the developer.
+- **Measurement:** Claude wrote and ran the performance script and the screenshot checks (in headless Edge).
+- **This README:** drafted by Claude.
 
 ## Known data issues
 
-Problems found in `server/data/task1-service-explorer.json`. The client never edits the source data: it works around each problem when it normalises the data (`client/src/domain/catalog.ts`) and records it in the catalog's `issues` list.
+Problems found in `server/data/task1-service-explorer.json`. The client never edits the source data. It works around each problem when it normalises the data (`client/src/domain/catalog.ts`) and records it in the catalog's `issues` list.
 
 ### Needs fixing at the source
 
@@ -52,3 +260,4 @@ Problems found in `server/data/task1-service-explorer.json`. The client never ed
 | Wellness services have `price: null` and price by duration | Shown as "From" their cheapest duration. |
 | "Free Dental Consultation" has a price of 0 with no discount | A legitimate price, shown as "Free". |
 | 31 discounted prices where the service charge cancels out the discount (e.g. "Home HbA1c Test": listed NPR 5,690, final NPR 5,724.50) | The original price is only struck through when the final price is actually lower, so no saving is advertised that isn't there. |
+| No visible service has "Ultrasound" in its title (the one that does, "Thyroid Ultrasound", is hidden) | Searching "ultrasound" still finds services through their category name. |
