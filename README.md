@@ -51,3 +51,4 @@ Problems found in `server/data/task1-service-explorer.json`. The client never ed
 | 198 inactive services, 108 services from 2 inactive providers, and 41 services in the inactive "Seasonal Offers" category | Hidden (2,853 of 3,200 services are visible). |
 | Wellness services have `price: null` and price by duration | Shown as "From" their cheapest duration. |
 | "Free Dental Consultation" has a price of 0 with no discount | A legitimate price, shown as "Free". |
+| 31 discounted prices where the service charge cancels out the discount (e.g. "Home HbA1c Test": listed NPR 5,690, final NPR 5,724.50) | The original price is only struck through when the final price is actually lower, so no saving is advertised that isn't there. |

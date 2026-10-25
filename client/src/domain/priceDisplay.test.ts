@@ -32,6 +32,17 @@ describe('describePrice', () => {
     })
   })
 
+  it('strikes nothing through when the service charge outweighs the discount', () => {
+    // Home HbA1c Test: 5,690 less a discount, plus a charge, comes to 5,724.50
+    const outweighed: Price = { ...price(5724.5), original: 5690, afterDiscount: 5320, serviceCharge: 404.5, hasDiscount: true }
+    expect(describePrice({ kind: 'fixed', price: outweighed }, 'NPR')).toMatchObject({
+      final: 'NPR 5,724.50',
+      original: null,
+    })
+    const even: Price = { ...price(5690), original: 5690, afterDiscount: 5300, serviceCharge: 390, hasDiscount: true }
+    expect(describePrice({ kind: 'fixed', price: even }, 'NPR')).toMatchObject({ original: null })
+  })
+
   it('shows Free for a zero price', () => {
     expect(describePrice({ kind: 'fixed', price: price(0) }, 'NPR')).toMatchObject({ final: 'Free', original: null })
   })

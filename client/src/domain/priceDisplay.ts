@@ -7,7 +7,7 @@ export type PriceDisplay =
       kind: 'amount'
       /** Formatted final price, or "Free" */
       final: string
-      /** Formatted price before discount, shown struck through; null without a discount */
+      /** Formatted price before discount, shown struck through; null unless the final price is lower */
       original: string | null
       /** The cheapest of several durations: shown as "From …" */
       from: boolean
@@ -33,12 +33,16 @@ export function describePrice(pricing: ServicePricing, currency: string | null):
       ? pricing.price
       : pricing.tiers.reduce((cheapest, tier) => (tier.price.final < cheapest.price.final ? tier : cheapest)).price
 
-  const final = Math.round(price.final * 100) === 0 ? 'Free' : formatMoney(price.final, currency)
+  const finalCents = Math.round(price.final * 100)
+  const final = finalCents === 0 ? 'Free' : formatMoney(price.final, currency)
+  // A service charge can outweigh the discount. Striking through a lower
+  // "original" would advertise a saving that isn't there.
+  const saves = price.hasDiscount && finalCents < Math.round(price.original * 100)
 
   return {
     kind: 'amount',
     final,
-    original: price.hasDiscount ? formatMoney(price.original, currency) : null,
+    original: saves ? formatMoney(price.original, currency) : null,
     from: tiers !== null && tiers.length > 1,
     detail: tiers === null ? null : durationDetail(tiers.map((tier) => tier.durationMinutes)),
   }
