@@ -9,6 +9,8 @@ npm install
 npm run dev      # start dev server at http://localhost:5173
 npm run build    # type-check and build to dist/
 npm run lint
+npm test         # run unit tests once (Vitest)
+npm run test:watch
 npm run preview  # serve the production build
 ```
 

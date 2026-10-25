@@ -26,5 +26,6 @@ The root `package.json` only holds scripts; it is not an npm workspace. Each app
 | `npm run dev`   | Run server and client together (concurrently) |
 | `npm run build` | Build server, then client                     |
 | `npm run lint`  | Lint the client                               |
+| `npm test`      | Run client unit tests (Vitest)                |
 
 See [client/README.md](client/README.md) and [server/README.md](server/README.md) for more detail.
