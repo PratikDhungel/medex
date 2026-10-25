@@ -54,10 +54,13 @@
 
 :root {
     /* Brand tokens. Gradient stops are placeholders: the demo references
-       --e-global-color-d49ac81 / --e-global-color-332724a without values. */
-    --brand-from: #e8572a;
-    --brand-to: #ff8a4c;
-    --brand-glow: #ffb07b;
+       --e-global-color-d49ac81 / --e-global-color-332724a without values.
+       Every stop keeps white text at WCAG AA (4.5:1) or better, and
+       --brand-from as text on white too: from 5.09, to 4.53, glow 4.61.
+       The brighter originals (#e8572a, #ff8a4c, #ffb07b) only reached 2.3–3.6. */
+    --brand-from: #c2410c;
+    --brand-to: #cc4a14;
+    --brand-glow: #c94a1a;
     --brand-foreground: #fdfdfd;
     --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
     --font-accent-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
