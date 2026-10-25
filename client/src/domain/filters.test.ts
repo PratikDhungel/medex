@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { countActiveFilters, DEFAULT_FILTERS, facetOption, parsePriceInput } from './filters'
+import { countActiveFilters, DEFAULT_FILTERS, facetOption, parsePriceInput, toggleParent, toggleValue } from './filters'
+
+describe('toggleValue', () => {
+  it('adds and removes without duplicates', () => {
+    expect(toggleValue(['a'], 'b', true)).toEqual(['a', 'b'])
+    expect(toggleValue(['a'], 'a', true)).toEqual(['a'])
+    expect(toggleValue(['a', 'b'], 'a', false)).toEqual(['b'])
+  })
+})
+
+describe('toggleParent', () => {
+  it('drops selected children when the parent is selected', () => {
+    expect(toggleParent(['thyroid', 'other'], 'blood', ['thyroid', 'hba1c'], true)).toEqual(['other', 'blood'])
+  })
+
+  it('leaves other selections alone when the parent is cleared', () => {
+    expect(toggleParent(['blood', 'other'], 'blood', ['thyroid'], false)).toEqual(['other'])
+  })
+})
 
 describe('parsePriceInput', () => {
   it('reads numbers with separators, and empty as no bound', () => {

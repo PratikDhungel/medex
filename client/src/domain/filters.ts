@@ -106,6 +106,21 @@ export function parsePriceInput(text: string): number | null | 'invalid' {
   return Number.isFinite(value) && value >= 0 ? value : 'invalid'
 }
 
+/** Adds or removes a value, keeping the list free of duplicates */
+export function toggleValue<V>(list: readonly V[], value: V, selected: boolean): V[] {
+  const rest = list.filter((item) => item !== value)
+  return selected ? [...rest, value] : rest
+}
+
+/**
+ * Toggles a parent such as a category or country. A selected parent covers
+ * its children, so selecting it drops any of them that were selected.
+ */
+export function toggleParent<V>(list: readonly V[], parent: V, children: readonly V[], selected: boolean): V[] {
+  const next = toggleValue(list, parent, selected)
+  return selected ? next.filter((item) => !children.includes(item)) : next
+}
+
 export function facetOption<V>(value: V, label: string, count: number, selected: boolean): FacetOption<V> {
   return { value, label, count, selected, disabled: count === 0 && !selected }
 }
