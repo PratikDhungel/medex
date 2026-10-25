@@ -71,7 +71,7 @@ describe('buildCategoryTree', () => {
   const tree = buildCategoryTree(categories)
 
   it('groups top-level categories by type, in type order', () => {
-    expect(tree.map((group) => group.label)).toEqual(['Packages', 'Lab tests'])
+    expect(tree.map((group) => group.label)).toEqual(['Packages', 'Lab Tests'])
   })
 
   it('orders siblings by position and nests children under their own parent', () => {
@@ -88,8 +88,8 @@ describe('buildCategoryTree', () => {
 
 describe('categoryPath', () => {
   it('tells same-named categories apart', () => {
-    expect(categoryPath('thy-blood', categories)).toEqual(['Lab tests', 'Blood Tests', 'Thyroid'])
-    expect(categoryPath('thy-us-lab', categories)).toEqual(['Lab tests', 'Ultrasound', 'Thyroid'])
+    expect(categoryPath('thy-blood', categories)).toEqual(['Lab Tests', 'Blood Tests', 'Thyroid'])
+    expect(categoryPath('thy-us-lab', categories)).toEqual(['Lab Tests', 'Ultrasound', 'Thyroid'])
     expect(categoryPath('us-pkg', categories)).toEqual(['Packages', 'Ultrasound'])
     expect(categoryPath('nope', categories)).toEqual([])
   })
@@ -147,7 +147,7 @@ describe('categories on the real data', () => {
   it('keeps the two top-level ultrasounds separate', () => {
     const tree = buildCategoryTree(catalog.categories)
     const ultrasounds = tree.flatMap((g) => g.nodes.filter((n) => n.category.slug === 'ultrasound').map(() => g.label))
-    expect(ultrasounds).toEqual(['Packages', 'Lab tests'])
+    expect(ultrasounds).toEqual(['Packages', 'Lab Tests'])
   })
 
   it('counts each thyroid on its own, adding up to their total', () => {

@@ -72,7 +72,7 @@ export function buildCategoryTree(categories: Map<string, Category>): CategoryTy
 }
 
 /**
- * Full path for a category, e.g. ["Lab tests", "Blood Tests", "Thyroid"].
+ * Full path for a category, e.g. ["Lab Tests", "Blood Tests", "Thyroid"].
  * Unambiguous wherever a category appears without the tree around it,
  * such as an active-filter chip.
  */
