@@ -16,14 +16,21 @@ export interface Catalog {
   /** Visible services only */
   services: Service[]
   providers: Map<number, Provider>
+  /** Empty when categories failed to load */
   categories: Map<string, Category>
+  /**
+   * False when categories failed to load. Results are still shown, but
+   * category visibility couldn't be checked and the category filter is off.
+   */
+  categoriesAvailable: boolean
   /** How many services each rule hid; a service counts under its first reason */
   hidden: Record<HiddenReason, number>
   issues: DataIssue[]
 }
 
 export interface RawCatalog {
-  categories: RawCategory[]
+  /** null when categories failed to load (partial data) */
+  categories: RawCategory[] | null
   providers: RawProvider[]
   services: RawService[]
 }
@@ -138,15 +145,17 @@ export function normaliseService(raw: RawService, provider: Provider | undefined
  * visible when it is active, its provider is active, and its category and
  * subcategory (if any) are active. A category missing from the response is
  * treated as inactive: the source endpoint only lists active ones.
+ * With no categories at all (they failed to load) the category rule is skipped.
  */
 export function hiddenReason(
   raw: RawService,
   provider: Provider | undefined,
-  categories: Map<string, Category>,
+  categories: Map<string, Category> | null,
 ): HiddenReason | null {
   if (raw.status !== true) return 'service-inactive'
   if (!provider) return 'provider-missing'
   if (!provider.active) return 'provider-inactive'
+  if (!categories) return null
 
   for (const id of [raw.categoryId, raw.subCategoryId]) {
     if (id === null || id === undefined) continue
@@ -159,7 +168,7 @@ export function hiddenReason(
 
 export function buildCatalog(raw: RawCatalog): Catalog {
   const issues: DataIssue[] = []
-  const categories = indexCategories(raw.categories)
+  const categories = raw.categories ? indexCategories(raw.categories) : null
 
   const providers = new Map<number, Provider>()
   for (const rawProvider of raw.providers) {
@@ -194,7 +203,7 @@ export function buildCatalog(raw: RawCatalog): Catalog {
       continue
     }
 
-    const subCategory = rawService.subCategoryId ? categories.get(rawService.subCategoryId) : undefined
+    const subCategory = rawService.subCategoryId ? categories?.get(rawService.subCategoryId) : undefined
     if (subCategory && subCategory.parentId !== rawService.categoryId) {
       issues.push({ entity: 'service', id: rawService.id, code: 'subcategory-parent-mismatch' })
     }
@@ -202,5 +211,12 @@ export function buildCatalog(raw: RawCatalog): Catalog {
     services.push(normaliseService(rawService, provider, issues))
   }
 
-  return { services, providers, categories, hidden, issues }
+  return {
+    services,
+    providers,
+    categories: categories ?? new Map(),
+    categoriesAvailable: categories !== null,
+    hidden,
+    issues,
+  }
 }

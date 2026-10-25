@@ -88,6 +88,14 @@ describe('buildCatalog visibility', () => {
     expect(build({ services: [service({ categoryId: null, subCategoryId: null })] }).services).toHaveLength(1)
   })
 
+  it('skips the category rule when categories failed to load', () => {
+    const catalog = build({ categories: null, services: [service(), service({ id: 's2', status: false })] })
+    expect(catalog.services.map((s) => s.id)).toEqual(['s1'])
+    expect(catalog.categoriesAvailable).toBe(false)
+    expect(catalog.categories.size).toBe(0)
+    expect(build({}).categoriesAvailable).toBe(true)
+  })
+
   it('accepts provider status in any case', () => {
     expect(build({ providers: [provider({ status: ' Active ' })] }).services).toHaveLength(1)
   })

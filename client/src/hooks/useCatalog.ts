@@ -2,6 +2,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { categoriesQuery, providersQuery, servicesQuery, type CatalogResource } from '@/api/catalog'
 import { buildCatalog, type Catalog } from '@/domain/catalog'
+import { deriveCatalogStatus, type CatalogStatus } from './catalogStatus'
 
 export interface CatalogFailure {
   resource: CatalogResource
@@ -9,13 +10,12 @@ export interface CatalogFailure {
 }
 
 export interface CatalogState {
-  /** Built once all three resources have loaded */
+  status: CatalogStatus
+  /** Built once services and providers load, and categories load or fail */
   catalog: Catalog | undefined
-  /** Some resource hasn't loaded yet and hasn't failed */
-  pending: boolean
-  /** Waiting for a connection before fetching (TanStack pauses when offline) */
-  paused: boolean
   failures: CatalogFailure[]
+  /** A retry of a failed resource is in flight */
+  retrying: boolean
   /** Refetches only the resources that failed */
   retry: () => void
 }
@@ -26,12 +26,22 @@ export function useCatalog(): CatalogState {
   const results = useQueries({ queries: [categoriesQuery, providersQuery, servicesQuery] })
   const [categories, providers, services] = results
 
+  const status = deriveCatalogStatus(
+    { categories: categories.status, providers: providers.status, services: services.status },
+    results.some((result) => result.fetchStatus === 'paused'),
+  )
+
+  const categoriesSettled = categories.data !== undefined || categories.isError
   const catalog = useMemo(
     () =>
-      categories.data && providers.data && services.data
-        ? buildCatalog({ categories: categories.data, providers: providers.data, services: services.data })
+      providers.data && services.data && categoriesSettled
+        ? buildCatalog({
+            categories: categories.data ?? null,
+            providers: providers.data,
+            services: services.data,
+          })
         : undefined,
-    [categories.data, providers.data, services.data],
+    [categories.data, categoriesSettled, providers.data, services.data],
   )
 
   const failures = results.flatMap((result, index) =>
@@ -45,10 +55,10 @@ export function useCatalog(): CatalogState {
   }
 
   return {
+    status,
     catalog,
-    pending: results.some((result) => result.isPending && !result.isError),
-    paused: results.some((result) => result.fetchStatus === 'paused'),
     failures,
+    retrying: results.some((result) => result.isError && result.isFetching),
     retry,
   }
 }
