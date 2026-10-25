@@ -1,0 +1,15 @@
+{
+  "name": "medex",
+  "private": true,
+  "description": "Scripts to run the client and server together. Not a workspace; each app keeps its own dependencies.",
+  "scripts": {
+    "postinstall": "npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently --kill-others-on-fail --names server,client --prefix-colors blue,magenta \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "lint": "npm run lint --prefix client",
+    "test": "npm test --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

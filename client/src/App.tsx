@@ -1,48 +1,22 @@
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { ServiceExplorer } from '@/components/explorer/ServiceExplorer'
 
 function App() {
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-3xl flex-col gap-10 px-4 py-12 sm:px-6">
-      <header className="space-y-2">
-        <h1 className="font-accent text-3xl font-semibold tracking-tight">medex</h1>
-        <p className="text-muted-foreground">UI components preview</p>
+    <div className="min-h-svh bg-background">
+      <header className="border-b">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center px-4 sm:px-6">
+          <span className="font-accent text-xl font-semibold tracking-tight">medex</span>
+        </div>
       </header>
 
-      <section className="space-y-4">
-        <h2 className="font-accent text-lg font-medium">Buttons</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button>Primary</Button>
-          <Button variant="solid">Solid</Button>
-          <Button variant="secondary">Secondary</Button>
-          <Button variant="outline">Outline</Button>
-          <Button variant="ghost">Ghost</Button>
-          <Button variant="link">Link</Button>
-          <Button variant="destructive">Destructive</Button>
-          <Button disabled>Disabled</Button>
+      <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+        <div className="space-y-1">
+          <h1 className="font-accent text-2xl font-semibold tracking-tight sm:text-3xl">Find a health service</h1>
+          <p className="text-muted-foreground">Compare services and prices from providers near you.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button size="xs">Extra small</Button>
-          <Button size="sm">Small</Button>
-          <Button>Default</Button>
-          <Button size="lg">Large</Button>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="font-accent text-lg font-medium">Inputs</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Input placeholder="Default" />
-          <Input type="email" placeholder="Email" />
-          <Input placeholder="Invalid" aria-invalid />
-          <Input placeholder="Disabled" disabled />
-        </div>
-        <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(e) => e.preventDefault()}>
-          <Input placeholder="Search…" aria-label="Search" />
-          <Button type="submit" className="sm:w-auto">Search</Button>
-        </form>
-      </section>
-    </main>
+        <ServiceExplorer />
+      </main>
+    </div>
   )
 }
 

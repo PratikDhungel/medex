@@ -9,6 +9,8 @@ npm install
 npm run dev      # start dev server at http://localhost:5173
 npm run build    # type-check and build to dist/
 npm run lint
+npm test         # run unit tests once (Vitest)
+npm run test:watch
 npm run preview  # serve the production build
 ```
 
@@ -33,12 +35,14 @@ Brand values are defined once at the top of `:root` in `src/index.css`:
 
 | Token                | Value     | Use                                    |
 | -------------------- | --------- | -------------------------------------- |
-| `--brand-from`       | `#e8572a` | Gradient start; also shadcn `primary`  |
-| `--brand-to`         | `#ff8a4c` | Gradient end; focus ring               |
-| `--brand-glow`       | `#ffb07b` | Inset glow on the primary button       |
+| `--brand-from`       | `#c2410c` | Gradient start; also shadcn `primary`  |
+| `--brand-to`         | `#cc4a14` | Gradient end; focus ring               |
+| `--brand-glow`       | `#c94a1a` | Inset glow on the primary button       |
 | `--brand-foreground` | `#fdfdfd` | Text on brand backgrounds              |
 | `--font-body`        | Inter     | Body text (`font-sans`)                |
 | `--font-accent-family` | Poppins | Buttons and headings (`font-accent`)   |
+
+Every brand colour keeps white text at WCAG AA contrast (4.5 : 1) or better; check new values before changing them.
 
 These are exposed to Tailwind as `bg-brand-from`, `to-brand-to`, `text-brand-foreground`, `font-accent`, etc. Fonts are loaded from Google Fonts in `index.html`.
 
