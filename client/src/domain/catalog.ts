@@ -72,6 +72,14 @@ export function normaliseProvider(raw: RawProvider, issues: DataIssue[]): Provid
   }
 }
 
+/**
+ * A discount bigger than the price is a data error, not an offer: showing
+ * "Free" would promise something the provider never meant. Such prices are
+ * treated as unusable ("Price on request") and stay in the issues list.
+ */
+const isUsable = (price: Price | null): price is Price =>
+  price !== null && !price.issues.includes('discount-exceeds-price')
+
 function normalisePricing(raw: RawService, currency: string | null, issues: DataIssue[]): ServicePricing {
   const flag = (price: Price | null, tierId?: string) => {
     for (const code of price?.issues ?? []) {
@@ -87,7 +95,7 @@ function normalisePricing(raw: RawService, currency: string | null, issues: Data
     for (const tier of raw.wellnessPricing) {
       const price = computePrice(tier)
       flag(price, tier.id)
-      if (price && tier.durationInMinutes > 0) {
+      if (isUsable(price) && tier.durationInMinutes > 0) {
         tiers.push({ id: tier.id, durationMinutes: tier.durationInMinutes, price })
       } else {
         issues.push({ entity: 'service', id: raw.id, code: 'invalid-wellness-tier', detail: tier.id })
@@ -100,7 +108,7 @@ function normalisePricing(raw: RawService, currency: string | null, issues: Data
   const price = computePrice(raw)
   flag(price)
   if (!price) issues.push({ entity: 'service', id: raw.id, code: 'missing-price', detail: String(raw.price) })
-  return price ? { kind: 'fixed', price } : { kind: 'none' }
+  return isUsable(price) ? { kind: 'fixed', price } : { kind: 'none' }
 }
 
 function minPrice(pricing: ServicePricing): number | null {

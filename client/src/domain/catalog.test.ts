@@ -141,6 +141,31 @@ describe('buildCatalog normalisation', () => {
     expect(build({ providers: [provider({}, { currency: 'baht' })] }).services[0].pricing.kind).toBe('none')
   })
 
+  it('shows price on request, not Free, when the discount is bigger than the price', () => {
+    // Vitamin D Test: 450 with a 600 fixed discount
+    const catalog = build({ services: [service({ price: '450.00', discount: '600.00' })] })
+    expect(catalog.services[0].pricing.kind).toBe('none')
+    expect(catalog.services[0].minPrice).toBeNull()
+    expect(catalog.issues).toContainEqual({ entity: 'service', id: 's1', code: 'discount-exceeds-price' })
+  })
+
+  it('drops a wellness duration whose discount is bigger than its price', () => {
+    const tier = { discountType: 'amount', serviceCharge: '0.00', serviceChargeType: 'amount' } as const
+    const [s] = build({
+      services: [
+        service({
+          type: 'wellness',
+          price: null,
+          wellnessPricing: [
+            { ...tier, id: 't60', durationInMinutes: 60, price: '1800.00', discount: '0.00' },
+            { ...tier, id: 't90', durationInMinutes: 90, price: '2400.00', discount: '3000.00' },
+          ],
+        }),
+      ],
+    }).services
+    expect(s.pricing.kind === 'tiers' && s.pricing.tiers.map((t) => t.id)).toEqual(['t60'])
+  })
+
   it('tidies titles and flags them', () => {
     const catalog = build({ services: [service({ title: '  hba1c   TEST (Diabetes) ' })] })
     expect(catalog.services[0].title).toBe('hba1c TEST (Diabetes)')
@@ -181,7 +206,7 @@ describe('buildCatalog on the real data', () => {
     })
   })
 
-  it('prices every visible service', () => {
-    expect(catalog.services.filter((s) => s.pricing.kind === 'none')).toHaveLength(0)
+  it('prices every visible service except the one with a broken discount', () => {
+    expect(catalog.services.filter((s) => s.pricing.kind === 'none').map((s) => s.title)).toEqual(['Vitamin D Test'])
   })
 })
