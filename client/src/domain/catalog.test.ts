@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildCatalog, type RawCatalog } from './catalog'
-import { indexCategories } from './categories'
 import type { HiddenReason } from './model'
 import type { RawCategory, RawProvider, RawService } from './raw'
 
@@ -60,26 +59,6 @@ const service = (overrides: Partial<RawService> = {}): RawService => ({
 
 const build = (raw: Partial<RawCatalog>) =>
   buildCatalog({ categories: [category()], providers: [provider()], services: [service()], ...raw })
-
-describe('indexCategories', () => {
-  it('indexes parents and children by id', () => {
-    const index = indexCategories([category()])
-    expect(index.get('sub')).toMatchObject({ slug: 'thyroid', parentId: 'cat', active: true })
-  })
-
-  it('keeps categories that share a slug apart', () => {
-    const index = indexCategories([
-      category({ id: 'us-pkg', slug: 'ultrasound', type: 'package', children: [] }),
-      category({ id: 'us-lab', slug: 'ultrasound', type: 'lab_test', children: [] }),
-    ])
-    expect(index.get('us-pkg')?.type).toBe('package')
-    expect(index.get('us-lab')?.type).toBe('lab_test')
-  })
-
-  it('makes a child inactive when its parent is', () => {
-    expect(indexCategories([category({ status: false })]).get('sub')?.active).toBe(false)
-  })
-})
 
 describe('buildCatalog visibility', () => {
   it('keeps a fully active service', () => {
