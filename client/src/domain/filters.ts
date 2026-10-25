@@ -10,6 +10,9 @@ export const SORT_OPTIONS = [
 
 export type SortOption = (typeof SORT_OPTIONS)[number]['value']
 
+export const isSortOption = (value: string): value is SortOption =>
+  SORT_OPTIONS.some((option) => option.value === value)
+
 export interface FilterState {
   /** Free text over service title, provider name and category */
   query: string

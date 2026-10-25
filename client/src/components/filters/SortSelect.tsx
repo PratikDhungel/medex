@@ -1,13 +1,11 @@
 import { ChevronDown } from 'lucide-react'
 import { useId } from 'react'
-import { SORT_OPTIONS, type SortOption } from '@/domain/filters'
+import { isSortOption, SORT_OPTIONS, type SortOption } from '@/domain/filters'
 
 interface SortSelectProps {
   value: SortOption
   onChange: (value: SortOption) => void
 }
-
-const isSortOption = (value: string): value is SortOption => SORT_OPTIONS.some((option) => option.value === value)
 
 /** A native select: keyboard and screen-reader support, and the platform picker on phones */
 export function SortSelect({ value, onChange }: SortSelectProps) {
