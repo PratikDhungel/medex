@@ -318,6 +318,51 @@ Quantity changes are optimistic (`client/src/state/quantitySync.ts`). The new nu
 - **Focus after a removal** goes to the next line in the group, else the previous one, else the next (or previous) group's heading, else the page heading once the cart is empty. The removal is also announced ("CBC Profile was removed from your cart.").
 - **No stale reloads.** Both actions cancel any cart reload in flight first, and take part in the same response ordering as quantity changes, so an older response can't bring back a removed line or an old duration.
 
+## Checkout: the state of each order
+
+Each group in a checkout becomes its own order, paid on its own, so each has its own state (`client/src/domain/checkout/machine.ts`). "Pay for everything" submits the groups one after another, in the cart's order, and carries on past a failure, so one problem never holds up the rest.
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> submitting: send POST /checkout<br/>(saved first)
+    submitting --> confirming: 201, card
+    submitting --> booked: 201, pay at clinic
+    submitting --> paid: 201, already paid
+    submitting --> interrupted: 500 / no response / offline / page reloaded
+    submitting --> declined: 402
+    submitting --> cart_changed: 409
+    submitting --> rejected: 400 / key reused
+    confirming --> paid: GET /orders → paid
+    confirming --> payment_failed: GET /orders → failed
+    interrupted --> queued: retry, SAME key
+    declined --> queued: retry, NEW key
+    payment_failed --> queued: retry, NEW key
+    cart_changed --> queued: accept the cart as it is now, NEW key
+    paid --> [*]
+    booked --> [*]
+    rejected --> [*]
+```
+
+### How double charges are prevented
+
+- **Every attempt carries an idempotency key, and the key outlives uncertainty.** If we don't know whether an order was created (a 500, a dropped connection, the tab closed mid-request), the retry reuses the same key. The server either creates the order or returns the one it already made; it never makes a second one.
+- **A key is spent only when we know no usable order came of it:** a declined card (402), a payment that failed after the order was made, a cart that changed (409), or a request the server refused (400). The next attempt is then a genuinely new order, with a new key.
+- **The payment method is locked while a key is outstanding.** The first attempt may already have created an order by card; switching to "pay at clinic" with the same key would be a different request, which the server rightly refuses. Once the attempt is known to have failed, the method can change.
+- **Retry only what failed.** Succeeded orders are never resubmitted; the retry action exists only for interrupted, declined and failed orders.
+- **Late or duplicate events are ignored.** The reducer only accepts events that fit an order's current phase, so a double click or a response arriving after a reload can't move an order backwards.
+- **One request at a time.** Orders are submitted one after another, which also keeps progress easy to follow.
+
+### Reload safety
+
+The checkout session (orders, items, payment methods, keys and phases) is saved to `localStorage` on every change, and **before** each request is sent (`client/src/domain/checkout/storage.ts`). If the page reloads or the tab is closed mid-checkout:
+
+- an order that had a request out comes back as *interrupted* and is resolved by resending it with the same key, which returns the existing order if it was made;
+- an order waiting for its card payment carries on being checked with `GET /orders/:id`;
+- finished orders show as finished; nothing starts again from scratch.
+
+A session that can't be read (corrupt, or an unknown version) is dropped rather than guessed at. If storage isn't available at all (some private modes), checkout still works but can't survive a reload.
+
 ## Known data issues (Task 2)
 
 | Situation | What happens |
