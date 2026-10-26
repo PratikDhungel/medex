@@ -1,6 +1,7 @@
 import { ShoppingCart } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { useCartItemCount } from '@/hooks/useCart'
 import { cn } from '@/lib/utils'
 
 /**
@@ -12,6 +13,7 @@ export function AppLayout() {
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
   const previousPath = useRef(pathname)
+  const cartCount = useCartItemCount()
 
   useEffect(() => {
     // Only page changes: the explorer's filters change the query string, not the path
@@ -39,6 +41,12 @@ export function AppLayout() {
             >
               <ShoppingCart aria-hidden className="size-4" />
               Cart
+              {cartCount !== undefined && cartCount > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-xs leading-5 text-primary-foreground tabular-nums">
+                  {cartCount}
+                  <span className="sr-only"> {cartCount === 1 ? 'item' : 'items'}</span>
+                </span>
+              )}
             </NavLink>
           </nav>
         </div>

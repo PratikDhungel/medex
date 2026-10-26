@@ -1,11 +1,11 @@
-import { CloudOff, Info, RotateCw, SearchX, TriangleAlert, WifiOff } from 'lucide-react'
+import { CloudOff, Info, SearchX, TriangleAlert, WifiOff } from 'lucide-react'
 import { failureMessage } from '@/api/failureMessage'
+import { RetryButton } from '@/components/common/RetryButton'
 import { Button } from '@/components/ui/button'
 import type { Catalog } from '@/domain/catalog'
 import type { ProviderGroup } from '@/domain/grouping'
 import type { CatalogFailure } from '@/hooks/useCatalog'
 import type { CatalogStatus } from '@/hooks/catalogStatus'
-import { cn } from '@/lib/utils'
 import { ProviderCard, ProviderCardSkeleton } from './ProviderCard'
 import { StatePanel } from './StatePanel'
 
@@ -31,15 +31,6 @@ export interface ExplorerViewProps {
   slow: boolean
   isExpanded: (providerId: number) => boolean
   onExpandedChange: (providerId: number, expanded: boolean) => void
-}
-
-function RetryButton({ retrying, onRetry, variant }: { retrying: boolean; onRetry: () => void; variant?: 'outline' }) {
-  return (
-    <Button variant={variant} onClick={onRetry} disabled={retrying}>
-      <RotateCw aria-hidden className={cn(retrying && 'animate-spin')} />
-      {retrying ? 'Retrying…' : 'Try again'}
-    </Button>
-  )
 }
 
 function countText(status: CatalogStatus, totals: ExplorerViewProps['totals'], slow: boolean): string {
