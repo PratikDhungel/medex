@@ -42,3 +42,27 @@ export interface RawCart {
   groups: RawCartGroup[]
   totalItems?: unknown
 }
+
+/** A guest's cart, as stored on their device before logging in */
+export interface RawGuestCartItem {
+  productId: string
+  quantity: number
+  wellnessPricingId?: string
+}
+
+/**
+ * One outcome of merging a guest cart, as POST /cart/merge reports it. `kind`
+ * says which fields are present; unknown kinds may appear as the API evolves.
+ */
+export interface RawMergeChange {
+  kind: string
+  productId?: unknown
+  lineId?: unknown
+  title?: unknown
+  quantity?: unknown
+  accountQuantity?: unknown
+  guestQuantity?: unknown
+  durationInMinutes?: unknown
+  requested?: unknown
+  index?: unknown
+}
