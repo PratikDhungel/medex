@@ -268,6 +268,17 @@ Problems found in `server/data/task1-service-explorer.json`. The client never ed
 
 This section grows as the task is built; the full write-up (state machine, double-charge prevention, trade-offs) comes at the end.
 
+## Trying the failure cases (Task 2)
+
+Every page has a **Mock API** button in the bottom-left corner. It opens a panel (not a modal; Escape closes it) that talks to the mock server's runtime rules (`PUT /api/__mock/config`, see `server/README.md`):
+
+- **Scenarios**, one click each: the next package checkout is declined (402); the next lab test order is made but its response is lost (500 after the work); the connection drops after an order is made; the next quantity change is refused (409) or fails (500); the next login's merge fails; loading the cart fails; everything is slow (+3 s); card payments fail after the order is placed.
+- **Custom rule:** any call, any error status or a dropped connection, before or after the work is done, for one group or all, once or every time, with extra delay.
+- **Active rules** in plain words, each removable; "next time only" rules drop off once used.
+- **Reset demo** restores the original cart, forgets every order and the checkout, and makes you a first-time guest with saved items again, so the whole story can be replayed.
+
+The panel ships in every build, collapsed, because reviewers need it on a deployed copy too; in a real product it would be behind a development flag. The Task 1 query flags (`?mockDelay=3000`, `?mockFail=cart`) still work. For offline, use the browser's network tools.
+
 ## Guest cart merge
 
 When a guest logs in, the cart saved on their device is merged into their account's cart (`POST /api/cart/merge`, logic in `server/src/cart/merge.ts`). Every item is merged on its own, so one bad item never blocks the rest, and the server reports each outcome in `changes` so the customer can be told exactly what happened.

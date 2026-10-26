@@ -2,6 +2,7 @@ import { ShoppingCart } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { LogInButton } from '@/components/account/LogInButton'
+import { DevPanel } from '@/components/dev/DevPanel'
 import { Button } from '@/components/ui/button'
 import { useAccount, useAccountStore } from '@/hooks/useAccount'
 import { useCartItemCount } from '@/hooks/useCart'
@@ -68,9 +69,11 @@ export function AppLayout() {
         </div>
       </header>
 
-      <main ref={mainRef} className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+      <main ref={mainRef} className="mx-auto w-full max-w-6xl space-y-6 px-4 pt-8 pb-24 sm:px-6">
         <Outlet />
       </main>
+
+      <DevPanel />
     </div>
   )
 }
