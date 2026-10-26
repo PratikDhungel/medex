@@ -1,0 +1,47 @@
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useSyncExternalStore } from 'react'
+import { cartKey } from '@/api/cart'
+import { getOrder, placeOrder } from '@/api/orders'
+import type { CheckoutSession } from '@/domain/checkout/machine'
+import type { SessionStorageLike } from '@/domain/checkout/storage'
+import { CheckoutStore } from '@/state/checkoutStore'
+
+const stores = new WeakMap<QueryClient, CheckoutStore>()
+
+/** localStorage, or nothing at all where it isn't available (checkout then can't survive a reload) */
+function browserStorage(): SessionStorageLike {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage
+  } catch {
+    // Some browsers throw on access in private mode
+  }
+  return { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+}
+
+function createStore(queryClient: QueryClient): CheckoutStore {
+  return new CheckoutStore({
+    storage: browserStorage(),
+    placeOrder,
+    getOrder: (orderId) => getOrder(orderId),
+    newKey: () => crypto.randomUUID(),
+    now: () => new Date().toISOString(),
+    onCartChanged: () => void queryClient.invalidateQueries({ queryKey: cartKey, exact: true }),
+  })
+}
+
+/** The checkout store shared by every component using the same QueryClient */
+export function useCheckoutStore(): CheckoutStore {
+  const queryClient = useQueryClient()
+  let store = stores.get(queryClient)
+  if (!store) {
+    store = createStore(queryClient)
+    stores.set(queryClient, store)
+  }
+  return store
+}
+
+/** The current checkout session, or null when there isn't one */
+export function useCheckoutSession(): CheckoutSession | null {
+  const store = useCheckoutStore()
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+}

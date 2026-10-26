@@ -22,6 +22,16 @@ export interface CartViewProps {
   retrying: boolean
   onRetry: () => void
   controls: LineControls
+  booking: Booking
+}
+
+/** Starting a checkout from the cart */
+export interface Booking {
+  onBook: (groupTypes: string[]) => void
+  /** A checkout with unfinished orders exists, so a new one can't start yet */
+  blocked: boolean
+  /** A summary of the existing checkout, if there is one, linking to it */
+  existing: { text: string; unresolved: boolean } | null
 }
 
 function statusText({ status, cart, slow }: CartViewProps): string {
@@ -60,12 +70,26 @@ export function CartView(props: CartViewProps) {
         </div>
       )}
 
+      {props.booking.existing && status.kind === 'ready' && (
+        <div className="flex flex-col gap-3 rounded-xl border bg-muted/50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <span className="font-medium">
+              {props.booking.existing.unresolved ? 'You have a checkout in progress. ' : 'Your last checkout: '}
+            </span>
+            {props.booking.existing.text}
+          </p>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/checkout">View checkout</Link>
+          </Button>
+        </div>
+      )}
+
       <CartBody {...props} />
     </div>
   )
 }
 
-function CartBody({ status, cart, retrying, onRetry, controls }: CartViewProps) {
+function CartBody({ status, cart, retrying, onRetry, controls, booking }: CartViewProps) {
   const summary = useMemo(() => (cart ? summariseCart(cart) : null), [cart])
 
   switch (status.kind) {
@@ -131,12 +155,12 @@ function CartBody({ status, cart, retrying, onRetry, controls }: CartViewProps) 
             <ul className="space-y-4">
               {cart.groups.map((group) => (
                 <li key={group.type}>
-                  <CartGroupSection group={group} controls={controls} />
+                  <CartGroupSection group={group} controls={controls} booking={booking} />
                 </li>
               ))}
             </ul>
           }
-          summary={<CartSummaryPanel summary={summary} />}
+          summary={<CartSummaryPanel summary={summary} cart={cart} booking={booking} />}
         />
       )
   }

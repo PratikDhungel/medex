@@ -40,6 +40,7 @@ const render = (overrides: Partial<CartViewProps>) =>
         retrying={false}
         onRetry={() => {}}
         controls={controls()}
+        booking={{ onBook: () => {}, blocked: false, existing: null }}
         {...overrides}
       />
     </MemoryRouter>,

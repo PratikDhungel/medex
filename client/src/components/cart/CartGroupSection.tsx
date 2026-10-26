@@ -3,7 +3,9 @@ import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { CartGroup } from '@/domain/cart/model'
 import { formatMoney } from '@/domain/money'
+import { BookButton } from './BookButton'
 import { CartLineItem, type LineControls } from './CartLineItem'
+import type { Booking } from './CartView'
 import { blockerText, formatList, groupLabel, lineTitle, plural } from './copy'
 import { groupHeadingId } from './focus'
 
@@ -64,7 +66,7 @@ function Subtotals({ group }: { group: CartGroup }) {
 }
 
 /** One cart group: what becomes one booking, paid for on its own */
-export function CartGroupSection({ group, controls }: { group: CartGroup; controls: LineControls }) {
+export function CartGroupSection({ group, controls, booking }: { group: CartGroup; controls: LineControls; booking: Booking }) {
   const headingId = groupHeadingId(group.type)
   const providers = formatList(group.providers.map((provider) => provider.name))
   const excluded = group.bookable ? group.excludedLineIds.length : 0
@@ -100,7 +102,14 @@ export function CartGroupSection({ group, controls }: { group: CartGroup; contro
             </p>
           )}
         </div>
-        <Subtotals group={group} />
+        <div className="flex flex-col gap-3 sm:items-end">
+          <Subtotals group={group} />
+          {group.ready && (
+            <BookButton booking={booking} groupTypes={[group.type]} variant="outline">
+              Book {groupLabel(group).toLowerCase()}
+            </BookButton>
+          )}
+        </div>
       </footer>
     </Card>
   )

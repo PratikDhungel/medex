@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { CartView } from '@/components/cart/CartView'
 import { lineTitle } from '@/components/cart/copy'
 import { focusTargetAfterRemoval } from '@/components/cart/focus'
+import { sessionSummaryText } from '@/components/checkout/copy'
+import { checkoutHref } from '@/components/checkout/links'
+import { hasUnresolved, summariseSession } from '@/domain/checkout/machine'
 import { useCart } from '@/hooks/useCart'
 import { useCartActions } from '@/hooks/useCartActions'
+import { useCheckoutSession, useCheckoutStore } from '@/hooks/useCheckout'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useElapsed } from '@/hooks/useElapsed'
 import { useOnline } from '@/hooks/useOnline'
@@ -21,6 +26,10 @@ export function CartPage() {
   const actions = useCartActions()
   const online = useOnline()
   const slow = useElapsed(status.kind === 'loading', SLOW_AFTER_MS)
+  const session = useCheckoutSession()
+  const checkout = useCheckoutStore()
+  const navigate = useNavigate()
+  const unresolved = session ? hasUnresolved(session) : false
 
   const [announcement, setAnnouncement] = useState('')
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null)
@@ -65,6 +74,15 @@ export function CartPage() {
           onDismissFailure: dismissQuantityFailure,
           onSelectDuration: actions.selectDuration,
           onRemove: removeLine,
+        }}
+        booking={{
+          blocked: unresolved,
+          existing: session ? { text: sessionSummaryText(summariseSession(session)), unresolved } : null,
+          onBook: (groupTypes) => {
+            // A finished checkout makes way for the new one
+            if (session && !unresolved) checkout.clear()
+            navigate(checkoutHref(groupTypes))
+          },
         }}
       />
     </div>

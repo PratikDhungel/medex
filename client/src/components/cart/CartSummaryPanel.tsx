@@ -1,15 +1,19 @@
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatMoney } from '@/domain/money'
+import type { Cart } from '@/domain/cart/model'
 import type { CartSummary } from '@/domain/cart/summary'
+import { BookButton } from './BookButton'
+import type { Booking } from './CartView'
 import { plural } from './copy'
 
 /**
  * What the customer will pay, without pretending it's one payment: one line
  * per currency, the number of separate bookings, and what isn't priced yet.
  */
-export function CartSummaryPanel({ summary }: { summary: CartSummary }) {
+export function CartSummaryPanel({ summary, cart, booking }: { summary: CartSummary; cart: Cart; booking: Booking }) {
   const { totals, orderCount, readyOrderCount, unpricedCount, unavailableCount } = summary
+  const readyTypes = cart.groups.filter((group) => group.ready).map((group) => group.type)
 
   return (
     <Card className="gap-4 px-4 py-4 sm:px-6 sm:py-5">
@@ -63,6 +67,16 @@ export function CartSummaryPanel({ summary }: { summary: CartSummary }) {
           </p>
         )}
       </div>
+
+      {readyTypes.length > 0 && (
+        <BookButton booking={booking} groupTypes={readyTypes} className="w-full">
+          {readyTypes.length === 1
+            ? 'Book the ready group'
+            : readyTypes.length === orderCount
+              ? `Book all ${readyTypes.length} groups`
+              : `Book the ${readyTypes.length} ready groups`}
+        </BookButton>
+      )}
     </Card>
   )
 }

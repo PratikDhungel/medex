@@ -35,6 +35,8 @@ export type OrderPhaseKind = OrderPhase['kind']
 
 export interface GroupOrder {
   groupType: string
+  /** Provider names, for showing who the order is with */
+  providers: string[]
   /** Exactly what is being ordered, frozen when checkout starts */
   items: CheckoutItem[]
   /** What the customer saw they would pay, per currency */
@@ -107,6 +109,7 @@ export const allowedMethods = (groupType: string): PaymentMethod[] =>
 
 export interface NewOrder {
   groupType: string
+  providers: string[]
   items: CheckoutItem[]
   totals: Money[]
   paymentMethod: PaymentMethod
@@ -124,6 +127,30 @@ export function createSession(id: string, startedAt: string, orders: NewOrder[])
 /** The next order to submit; orders go one at a time, in session order */
 export function nextQueued(session: CheckoutSession): GroupOrder | undefined {
   return session.orders.find((order) => order.phase.kind === 'queued')
+}
+
+export interface SessionSummary {
+  total: number
+  /** Paid, or booked to pay at the clinic */
+  done: number
+  /** Waiting, being placed, or payment being confirmed */
+  inProgress: number
+  /** Failed in a way the customer can act on, or refused */
+  needsAction: number
+}
+
+export function summariseSession(session: CheckoutSession): SessionSummary {
+  const done = session.orders.filter(isDone).length
+  const inProgress = session.orders.filter(isInProgress).length
+  return { total: session.orders.length, done, inProgress, needsAction: session.orders.length - done - inProgress }
+}
+
+/**
+ * True while the session has business that must finish before a new
+ * checkout starts: an order in progress, or one whose outcome is unknown.
+ */
+export function hasUnresolved(session: CheckoutSession): boolean {
+  return session.orders.some((order) => isInProgress(order) || order.phase.kind === 'interrupted')
 }
 
 /** True while a request is out or an order is waiting its turn */

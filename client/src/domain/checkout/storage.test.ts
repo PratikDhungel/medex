@@ -30,7 +30,7 @@ const broken: SessionStorageLike = {
 
 const session = checkoutReducer(
   createSession('s1', '2026-10-26T00:00:00Z', [
-    { groupType: 'lab_test', items: [{ lineId: 'l1', quantity: 1, wellnessPricingId: null }], totals: [], paymentMethod: 'card' },
+    { groupType: 'lab_test', providers: [], items: [{ lineId: 'l1', quantity: 1, wellnessPricingId: null }], totals: [], paymentMethod: 'card' },
   ]),
   { type: 'submitting', groupType: 'lab_test', newKey: 'key-1' },
 )

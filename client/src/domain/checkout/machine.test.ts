@@ -6,6 +6,7 @@ import {
   createSession,
   isRunning,
   nextQueued,
+  summariseSession,
   type CheckoutEvent,
   type CheckoutSession,
   type GroupOrder,
@@ -16,9 +17,9 @@ const totals = [{ currency: 'THB', amount: 100 }]
 
 const start = () =>
   createSession('s1', '2026-10-26T00:00:00Z', [
-    { groupType: 'lab_test', items, totals, paymentMethod: 'card' },
-    { groupType: 'package', items, totals, paymentMethod: 'card' },
-    { groupType: 'wellness', items, totals, paymentMethod: 'pay_at_clinic' },
+    { groupType: 'lab_test', providers: [], items, totals, paymentMethod: 'card' },
+    { groupType: 'package', providers: [], items, totals, paymentMethod: 'card' },
+    { groupType: 'wellness', providers: [], items, totals, paymentMethod: 'pay_at_clinic' },
   ])
 
 const run = (session: CheckoutSession, ...events: CheckoutEvent[]) => events.reduce(checkoutReducer, session)
@@ -66,6 +67,7 @@ describe('checkoutReducer: the happy path', () => {
     )
     expect(order(session, 'wellness').phase).toEqual({ kind: 'booked', orderId: 'order-wellness' })
     expect(isRunning(session)).toBe(false)
+    expect(summariseSession(session)).toEqual({ total: 3, done: 1, inProgress: 2, needsAction: 0 })
   })
 })
 
@@ -153,7 +155,7 @@ describe('checkoutReducer: guards', () => {
   })
 
   it('does not offer pay at clinic for insurance', () => {
-    const session = createSession('s', 't', [{ groupType: 'insurance', items, totals, paymentMethod: 'card' }])
+    const session = createSession('s', 't', [{ groupType: 'insurance', providers: [], items, totals, paymentMethod: 'card' }])
     const after = run(session, { type: 'set_method', groupType: 'insurance', method: 'pay_at_clinic' })
     expect(after.orders[0].paymentMethod).toBe('card')
   })
