@@ -299,6 +299,18 @@ The guest cart in `server/data/task2-cart.json` overlaps the account's cart in f
 | Unreadable item (no product id, quantity 0, negative or not a whole number) | Skipped and reported; the other items still merge. |
 | The same product twice in the guest cart | Merged with the same "larger wins" rule. |
 
+## Changing quantities
+
+Quantity changes are optimistic (`client/src/state/quantitySync.ts`). The new number shows the moment "+" or "−" is tapped, and the line's price and the group and cart totals update with it.
+
+- **One request per line at a time, newest value wins.** While a change is being saved, further taps only move the target; when the request returns, the latest target is sent. Five quick taps from 1 send two requests (2, then 6), in order, and the screen goes 2, 3, 4, 5, 6 without jumping back. Tapping back to the saved value sends nothing more. Lines don't wait for each other.
+- **Out-of-order responses can't undo anything.** Every write returns the whole cart, and responses can arrive in any order. A response to an earlier request never replaces one to a later request (`client/src/state/cartWrites.ts`), and quantities the customer touched stay on top of the cached cart until a reload, made once everything has settled, confirms them.
+- **When the server refuses, the line goes back and says why.** A 409 or 500 restores the last quantity the server accepted, and the line shows (and announces) the reason, e.g. "You can book up to 10 of one service at a time. It's back to 10."
+- **When the outcome is unknown, the cart is reloaded instead.** If the connection drops mid-request, the change may or may not have been saved, so rolling back could be just as wrong as keeping it. The cart is reloaded and the line says so.
+- **Offline:** steppers are inactive, and the banner explains that changes wait until the connection is back.
+- **No client-side maximum.** The server owns the booking limit; the client shows its 409 rather than duplicating the rule.
+- **Keyboard:** "−" at 1 is marked `aria-disabled` rather than `disabled`, so focus isn't thrown back to the top of the page. Going below 1 means removing the item, which gets its own button.
+
 ## Known data issues (Task 2)
 
 | Situation | What happens |

@@ -6,12 +6,26 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/api/client'
 import { normaliseCart } from '@/domain/cart/normalise'
 import type { RawCart } from '@/domain/cart/raw'
+import type { QuantitySnapshot } from '@/state/quantitySync'
 import { CartView, type CartViewProps } from './CartView'
 
 const { serverCart } = JSON.parse(
   readFileSync(new URL('../../../../server/data/task2-cart.json', import.meta.url), 'utf8'),
 ) as { serverCart: RawCart }
 const cart = normaliseCart(serverCart)
+
+const LIVER_LINE = '76d58b51-449b-4f90-a936-1b6008dcf67d'
+const CBC_LINE = 'dbd4cac2-eb2b-4dc7-867e-0d5c13226036'
+
+const idle: QuantitySnapshot = { quantities: new Map(), pending: new Set(), failures: new Map() }
+
+const controls = (overrides: Partial<CartViewProps['controls']> = {}): CartViewProps['controls'] => ({
+  editable: true,
+  local: idle,
+  onQuantityChange: () => {},
+  onDismissFailure: () => {},
+  ...overrides,
+})
 
 const render = (overrides: Partial<CartViewProps>) =>
   renderToStaticMarkup(
@@ -23,6 +37,7 @@ const render = (overrides: Partial<CartViewProps>) =>
         slow={false}
         retrying={false}
         onRetry={() => {}}
+        controls={controls()}
         {...overrides}
       />
     </MemoryRouter>,
@@ -103,5 +118,38 @@ describe('CartView', () => {
     const html = render({ cart: normaliseCart({ groups: [] }) })
     expect(text(html)).toContain('Your cart is empty')
     expect(html).toContain('href="/"')
+  })
+
+  it('gives each service a labelled quantity stepper', () => {
+    const html = render({})
+    expect(html).toContain('aria-label="Quantity of Liver Function Profile"')
+    expect(html).toContain('aria-label="Increase quantity"')
+  })
+
+  it('keeps "−" focusable but inactive at 1, and disables steppers while offline', () => {
+    const atOne = render({})
+    // Six services can be changed; all but Liver Function Profile (2) are at 1
+    expect(atOne.match(/aria-label="Decrease quantity" aria-disabled="true"/g)).toHaveLength(5)
+    expect(atOne).not.toMatch(/aria-label="Decrease quantity"[^>]*disabled=""/)
+
+    const offline = render({ controls: controls({ editable: false }) })
+    expect(offline.match(/aria-label="Increase quantity" aria-disabled="true"/g)).toHaveLength(6)
+  })
+
+  it('shows "Saving…" only for lines being saved', () => {
+    const local = { ...idle, pending: new Set([LIVER_LINE]) }
+    expect(render({ controls: controls({ local }) }).match(/class="text-xs text-muted-foreground">Saving…/g)).toHaveLength(1)
+  })
+
+  it('explains a refused change on its line and announces it', () => {
+    const failure = {
+      lineId: CBC_LINE,
+      attempted: 11,
+      restored: 10,
+      error: new ApiError('http', '/cart/items/x', 'no', 409, { code: 'quantity_limit', details: { maxQuantity: 10 } }),
+    }
+    const html = render({ controls: controls({ local: { ...idle, failures: new Map([[CBC_LINE, failure]]) } }) })
+    expect(html).toContain('role="alert"')
+    expect(text(html)).toContain("You can book up to 10 of one service at a time. It's back to 10.")
   })
 })

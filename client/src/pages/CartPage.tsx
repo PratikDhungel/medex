@@ -10,14 +10,27 @@ const SLOW_AFTER_MS = 3000
 
 export function CartPage() {
   useDocumentTitle('Your cart')
-  const { status, cart, retrying, retry } = useCart()
+  const { status, cart, local, retrying, retry, setQuantity, dismissQuantityFailure } = useCart()
   const online = useOnline()
   const slow = useElapsed(status.kind === 'loading', SLOW_AFTER_MS)
 
   return (
     <>
       <PageHeading title="Your cart">Each group in your cart is booked and paid for separately.</PageHeading>
-      <CartView status={status} cart={cart} online={online} slow={slow} retrying={retrying} onRetry={retry} />
+      <CartView
+        status={status}
+        cart={cart}
+        online={online}
+        slow={slow}
+        retrying={retrying}
+        onRetry={retry}
+        controls={{
+          editable: online,
+          local,
+          onQuantityChange: setQuantity,
+          onDismissFailure: dismissQuantityFailure,
+        }}
+      />
     </>
   )
 }

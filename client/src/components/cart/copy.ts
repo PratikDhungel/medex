@@ -1,6 +1,8 @@
+import { ApiError } from '@/api/client'
 import { UNKNOWN_GROUP } from '@/domain/cart/normalise'
 import type { BlockReason, CartGroup, CartLine } from '@/domain/cart/model'
 import { serviceTypeLabel } from '@/domain/serviceTypes'
+import type { QuantityFailure } from '@/state/quantitySync'
 
 // Customer-facing wording for the cart, kept in one place so it stays consistent.
 
@@ -44,4 +46,24 @@ export function blockerText(reason: BlockReason, title: string): string {
     case 'invalid-quantity':
       return `${title} has a quantity we can't book. Change the quantity, or remove it.`
   }
+}
+
+/** Why a quantity change didn't stick, and what the line shows now */
+export function quantityFailureText({ error, restored }: QuantityFailure): string {
+  if (restored === null) {
+    return "We couldn't confirm that change, so we've reloaded your cart to show what's saved."
+  }
+  const back = `It's back to ${restored}.`
+
+  if (error instanceof ApiError) {
+    if (error.kind === 'offline') return `You're offline, so the quantity wasn't changed. ${back}`
+    if (error.code === 'quantity_limit') {
+      const max = (error.details as { maxQuantity?: unknown } | undefined)?.maxQuantity
+      return `You can book up to ${typeof max === 'number' ? max : 'a limited number'} of one service at a time. ${back}`
+    }
+    if (error.code === 'unavailable') return "This service is no longer offered, so its quantity can't be changed."
+    if (error.status === 404) return 'This item is no longer in your cart.'
+    if (error.status === 409) return `The quantity couldn't be changed right now. ${back}`
+  }
+  return `Something went wrong on our side, so the quantity wasn't changed. ${back} Please try again.`
 }

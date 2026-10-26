@@ -9,6 +9,7 @@ import type { Cart } from '@/domain/cart/model'
 import { summariseCart } from '@/domain/cart/summary'
 import type { CartStatus } from '@/hooks/cartStatus'
 import { CartGroupSection, CartGroupSkeleton } from './CartGroupSection'
+import type { LineControls } from './CartLineItem'
 import { CartSummaryPanel, CartSummarySkeleton } from './CartSummaryPanel'
 import { plural } from './copy'
 
@@ -20,6 +21,7 @@ export interface CartViewProps {
   slow: boolean
   retrying: boolean
   onRetry: () => void
+  controls: LineControls
 }
 
 function statusText({ status, cart, slow }: CartViewProps): string {
@@ -63,7 +65,7 @@ export function CartView(props: CartViewProps) {
   )
 }
 
-function CartBody({ status, cart, retrying, onRetry }: CartViewProps) {
+function CartBody({ status, cart, retrying, onRetry, controls }: CartViewProps) {
   const summary = useMemo(() => (cart ? summariseCart(cart) : null), [cart])
 
   switch (status.kind) {
@@ -129,7 +131,7 @@ function CartBody({ status, cart, retrying, onRetry }: CartViewProps) {
             <ul className="space-y-4">
               {cart.groups.map((group) => (
                 <li key={group.type}>
-                  <CartGroupSection group={group} />
+                  <CartGroupSection group={group} controls={controls} />
                 </li>
               ))}
             </ul>

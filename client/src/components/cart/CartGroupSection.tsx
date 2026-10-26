@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { CartGroup } from '@/domain/cart/model'
 import { formatMoney } from '@/domain/money'
-import { CartLineItem } from './CartLineItem'
+import { CartLineItem, type LineControls } from './CartLineItem'
 import { blockerText, formatList, groupLabel, lineTitle, plural } from './copy'
 
 function GroupStatus({ group }: { group: CartGroup }) {
@@ -64,7 +64,7 @@ function Subtotals({ group }: { group: CartGroup }) {
 }
 
 /** One cart group: what becomes one booking, paid for on its own */
-export function CartGroupSection({ group }: { group: CartGroup }) {
+export function CartGroupSection({ group, controls }: { group: CartGroup; controls: LineControls }) {
   const headingId = useId()
   const providers = formatList(group.providers.map((provider) => provider.name))
   const excluded = group.bookable ? group.excludedLineIds.length : 0
@@ -83,7 +83,7 @@ export function CartGroupSection({ group }: { group: CartGroup }) {
 
       <ul className="px-4 sm:px-6">
         {group.lines.map((line) => (
-          <CartLineItem key={line.id} line={line} />
+          <CartLineItem key={line.id} line={line} controls={controls} />
         ))}
       </ul>
 
