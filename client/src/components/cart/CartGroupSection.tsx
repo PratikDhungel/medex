@@ -1,15 +1,15 @@
 import { CircleAlert, CircleCheck } from 'lucide-react'
-import { useId } from 'react'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { CartGroup } from '@/domain/cart/model'
 import { formatMoney } from '@/domain/money'
 import { CartLineItem, type LineControls } from './CartLineItem'
 import { blockerText, formatList, groupLabel, lineTitle, plural } from './copy'
+import { groupHeadingId } from './focus'
 
 function GroupStatus({ group }: { group: CartGroup }) {
   if (!group.bookable) {
-    return <p className="text-sm text-muted-foreground">Nothing here can be booked. You can remove these items.</p>
+    return <p className="text-sm text-muted-foreground">Nothing here can be booked. Remove these items to tidy your cart.</p>
   }
   if (group.ready) {
     return (
@@ -65,7 +65,7 @@ function Subtotals({ group }: { group: CartGroup }) {
 
 /** One cart group: what becomes one booking, paid for on its own */
 export function CartGroupSection({ group, controls }: { group: CartGroup; controls: LineControls }) {
-  const headingId = useId()
+  const headingId = groupHeadingId(group.type)
   const providers = formatList(group.providers.map((provider) => provider.name))
   const excluded = group.bookable ? group.excludedLineIds.length : 0
 
@@ -73,7 +73,11 @@ export function CartGroupSection({ group, controls }: { group: CartGroup; contro
     <Card aria-labelledby={headingId} className="gap-0 py-0" role="region">
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 pt-4 pb-2 sm:px-6 sm:pt-5">
         <div className="min-w-0 space-y-1">
-          <h2 id={headingId} className="font-accent text-lg leading-snug font-semibold">
+          <h2
+            id={headingId}
+            tabIndex={-1}
+            className="rounded-sm font-accent text-lg leading-snug font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
             {groupLabel(group)}
           </h2>
           {providers && <p className="text-sm text-muted-foreground">From {providers}</p>}

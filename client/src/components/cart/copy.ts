@@ -67,3 +67,23 @@ export function quantityFailureText({ error, restored }: QuantityFailure): strin
   }
   return `Something went wrong on our side, so the quantity wasn't changed. ${back} Please try again.`
 }
+
+/** Why a chosen duration wasn't saved */
+export function durationFailureText(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.kind === 'offline') return "You're offline, so your choice wasn't saved."
+    if (error.kind === 'network') return "We couldn't confirm your choice, so we've reloaded your cart to show what's saved."
+    if (error.code === 'option_unavailable') return 'That duration is no longer offered. Please choose another.'
+    if (error.code === 'unavailable' || error.status === 404) return 'This service is no longer available to book.'
+  }
+  return "Something went wrong on our side, so your choice wasn't saved. Please try again."
+}
+
+/** Why an item wasn't removed */
+export function removeFailureText(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.kind === 'offline') return "You're offline, so this item wasn't removed."
+    if (error.kind === 'network') return "We couldn't confirm the removal, so we've reloaded your cart to show what's saved."
+  }
+  return "Something went wrong on our side, so this item wasn't removed. Please try again."
+}

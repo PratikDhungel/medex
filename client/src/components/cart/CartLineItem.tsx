@@ -5,7 +5,10 @@ import type { CartLine } from '@/domain/cart/model'
 import { formatMoney } from '@/domain/money'
 import type { QuantityFailure, QuantitySnapshot } from '@/state/quantitySync'
 import { blockedPriceText, lineTitle, quantityFailureText } from './copy'
+import { DurationPicker } from './DurationPicker'
+import { lineElementId } from './focus'
 import { QuantityStepper } from './QuantityStepper'
+import { RemoveLineButton } from './RemoveLineButton'
 
 /** What a line needs to be edited, passed down unchanged from the page */
 export interface LineControls {
@@ -15,6 +18,10 @@ export interface LineControls {
   /** `shown` is the quantity on screen when the change was asked for */
   onQuantityChange: (lineId: string, quantity: number, shown: number) => void
   onDismissFailure: (lineId: string) => void
+  /** Resolves once saved; rejects with the reason */
+  onSelectDuration: (lineId: string, optionId: string) => Promise<void>
+  /** Resolves once removed; rejects with the reason */
+  onRemove: (lineId: string) => Promise<void>
 }
 
 function FailureNotice({ failure, onDismiss }: { failure: QuantityFailure; onDismiss: () => void }) {
@@ -53,35 +60,62 @@ function LinePrice({ line }: { line: CartLine }) {
 
 export function CartLineItem({ line, controls }: { line: CartLine; controls: LineControls }) {
   const unavailable = line.status.kind === 'unavailable'
+  const title = lineTitle(line)
   const duration = line.durations.find((option) => option.id === line.selectedDurationId)
   const details = [line.provider?.name, duration && `${duration.minutes} min`].filter(Boolean).join(' · ')
   const failure = controls.local.failures.get(line.id)
 
   return (
-    <li className="space-y-2 border-t py-3 first:border-t-0">
+    // Focusable from script, so focus can land here after a neighbouring line is removed
+    <li
+      id={lineElementId(line.id)}
+      tabIndex={-1}
+      className="space-y-3 border-t py-3 outline-none first:border-t-0 focus-visible:rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
           <p className={unavailable ? 'font-medium break-words text-muted-foreground' : 'font-medium break-words'}>
-            {lineTitle(line)}
+            {title}
           </p>
           {details && <p className="text-sm text-muted-foreground">{details}</p>}
-          {unavailable ? (
+          {unavailable && (
             <Badge variant="outline" className="font-normal">
               <Ban aria-hidden />
               Removed by the provider. It won't be booked.
             </Badge>
-          ) : (
-            <QuantityStepper
-              title={lineTitle(line)}
-              quantity={line.quantity}
-              disabled={!controls.editable}
-              saving={controls.local.pending.has(line.id)}
-              onChange={(quantity) => controls.onQuantityChange(line.id, quantity, line.quantity)}
-            />
           )}
         </div>
         <LinePrice line={line} />
       </div>
+
+      {!unavailable && (
+        <DurationPicker
+          line={line}
+          editable={controls.editable}
+          onSelect={(optionId) => controls.onSelectDuration(line.id, optionId)}
+        />
+      )}
+
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        {unavailable ? (
+          <span />
+        ) : (
+          <QuantityStepper
+            title={title}
+            quantity={line.quantity}
+            disabled={!controls.editable}
+            saving={controls.local.pending.has(line.id)}
+            onChange={(quantity) => controls.onQuantityChange(line.id, quantity, line.quantity)}
+          />
+        )}
+        <RemoveLineButton
+          title={title}
+          editable={controls.editable}
+          prominent={unavailable}
+          onRemove={() => controls.onRemove(line.id)}
+        />
+      </div>
+
       {failure && <FailureNotice failure={failure} onDismiss={() => controls.onDismissFailure(line.id)} />}
     </li>
   )

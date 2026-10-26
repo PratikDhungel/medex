@@ -32,3 +32,15 @@ export function quantityIn(cart: RawCart, lineId: string): number | null {
   }
   return null
 }
+
+/** The cart without one line, e.g. once the server has confirmed its removal */
+export function withoutLine(cart: RawCart, lineId: string): RawCart {
+  return {
+    ...cart,
+    groups: cart.groups.map((group) =>
+      Array.isArray(group.items)
+        ? { ...group, items: (group.items as { id?: unknown }[]).filter((line) => line?.id !== lineId) }
+        : group,
+    ),
+  }
+}

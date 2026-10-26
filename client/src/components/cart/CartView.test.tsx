@@ -24,6 +24,8 @@ const controls = (overrides: Partial<CartViewProps['controls']> = {}): CartViewP
   local: idle,
   onQuantityChange: () => {},
   onDismissFailure: () => {},
+  onSelectDuration: async () => {},
+  onRemove: async () => {},
   ...overrides,
 })
 
@@ -151,5 +153,39 @@ describe('CartView', () => {
     const html = render({ controls: controls({ local: { ...idle, failures: new Map([[CBC_LINE, failure]]) } }) })
     expect(html).toContain('role="alert"')
     expect(text(html)).toContain("You can book up to 10 of one service at a time. It's back to 10.")
+  })
+
+  it('offers the facial durations as a radio group, none chosen yet', () => {
+    const html = render({})
+    expect(text(html)).toContain('Choose a duration for Signature Facial')
+    expect(text(html)).toContain('60 min · THB 1,800')
+    expect(text(html)).toContain('90 min · THB 2,040')
+    expect(html.match(/type="radio"/g)).toHaveLength(2)
+    expect(html).not.toMatch(/type="radio"[^>]*checked/)
+  })
+
+  it('shows the chosen duration and its price once saved', () => {
+    const groups = structuredClone(serverCart.groups)
+    groups[1].items = (groups[1].items as object[]).map((item) => ({
+      ...item,
+      wellnessPricingId: 'a1b2c3d4-0000-4000-8000-000000000090',
+    }))
+    const html = text(render({ cart: normaliseCart({ ...serverCart, groups }) }))
+    expect(html).toContain('Lotus Day Spa · 90 min')
+    expect(html).toMatch(/Signature Facial .*THB 2,040/)
+    expect(html).toContain("You'll pay, in 3 currencies INR 23,009.50 NPR 12,520 THB 18,947")
+    expect(html).not.toContain('not priced yet')
+  })
+
+  it('names what each Remove button removes, and makes it prominent for removed services', () => {
+    const html = render({})
+    expect(html).toContain('aria-label="Remove CBC Profile"')
+    expect(html).toContain('aria-label="Remove A service that is no longer offered"')
+  })
+
+  it('makes lines and group headings focusable from script', () => {
+    const html = render({})
+    expect(html).toContain(`id="cart-line-${CBC_LINE}" tabindex="-1"`)
+    expect(html).toContain('id="cart-group-lab_test" tabindex="-1"')
   })
 })

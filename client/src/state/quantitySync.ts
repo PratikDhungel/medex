@@ -93,6 +93,12 @@ export class QuantitySync {
     if (line.inFlight === null) void this.flush(lineId, line)
   }
 
+  /** Stops tracking a line that was removed from the cart */
+  forget(lineId: string) {
+    const known = this.lines.delete(lineId)
+    if (this.failures.delete(lineId) || known) this.publish()
+  }
+
   dismissFailure(lineId: string) {
     if (this.failures.delete(lineId)) this.publish()
   }
@@ -119,7 +125,13 @@ export class QuantitySync {
       try {
         cart = await this.deps.send(lineId, quantity)
       } catch (error) {
-        this.fail(lineId, line, quantity, error)
+        if (this.lines.get(lineId) === line) this.fail(lineId, line, quantity, error)
+        else this.checkIdle()
+        return
+      }
+      // Forgotten meanwhile (the line was removed): stop here
+      if (this.lines.get(lineId) !== line) {
+        this.checkIdle()
         return
       }
 

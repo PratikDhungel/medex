@@ -151,4 +151,18 @@ describe('QuantitySync', () => {
     expect(shown('a')).toBeUndefined()
     expect(calls).toHaveLength(1)
   })
+
+  it('stops syncing a line that was removed, even with taps still queued', async () => {
+    const { sync, calls, shown, idles, tick } = setup()
+    sync.set('a', 2, 1)
+    sync.set('a', 3, 1)
+    sync.forget('a')
+    expect(shown('a')).toBeUndefined()
+
+    calls[0].reject(new ApiError('http', '/cart/items/a', 'gone', 404))
+    await tick()
+    expect(calls).toHaveLength(1)
+    expect(sync.getSnapshot().failures.size).toBe(0)
+    expect(idles).toHaveLength(1)
+  })
 })
