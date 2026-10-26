@@ -25,6 +25,9 @@ export interface CheckoutStoreDeps {
   /** Delay between status checks for a card payment being confirmed */
   pollMs?: number
   sleep?: (ms: number) => Promise<void>
+  isOnline?: () => boolean
+  /** Calls back each time the connection comes back */
+  onOnline?: (callback: () => void) => void
 }
 
 const isErrorLike = (error: unknown): error is CheckoutErrorLike =>
@@ -49,10 +52,31 @@ export class CheckoutStore {
     this.deps = {
       pollMs: 1500,
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      isOnline: () => true,
+      onOnline: () => {},
       ...deps,
     }
     this.session = loadSession(deps.storage)
     this.pollConfirming()
+    this.resume()
+    this.deps.onOnline(() => this.resume())
+  }
+
+  /**
+   * Resends, with the same key, orders that never got an answer: cut off by
+   * a reload or a closed tab, or not sent because the customer was offline.
+   * The server returns the order if it was made, or makes it now, so the
+   * page shows the true state without the customer having to do anything.
+   * Waits for a connection; runs again whenever the connection comes back.
+   */
+  resume() {
+    if (!this.session || !this.deps.isOnline()) return
+    for (const order of this.session.orders) {
+      if (order.phase.kind === 'interrupted' && (order.phase.reason === 'unknown' || order.phase.reason === 'offline')) {
+        this.dispatch({ type: 'retry', groupType: order.groupType })
+      }
+    }
+    void this.run()
   }
 
   subscribe = (listener: () => void) => {

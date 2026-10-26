@@ -26,6 +26,8 @@ function createStore(queryClient: QueryClient): CheckoutStore {
     newKey: () => crypto.randomUUID(),
     now: () => new Date().toISOString(),
     onCartChanged: () => void queryClient.invalidateQueries({ queryKey: cartKey, exact: true }),
+    isOnline: () => globalThis.navigator?.onLine !== false,
+    onOnline: (callback) => globalThis.addEventListener?.('online', callback),
   })
 }
 

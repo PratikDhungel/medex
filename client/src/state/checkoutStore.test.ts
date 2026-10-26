@@ -28,7 +28,11 @@ function memoryStorage(): SessionStorageLike & { data: Map<string, string> } {
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 /** A store whose server answers come from `respond`, with every request recorded */
-function setup(respond: (request: CheckoutRequest, attempt: number) => PlacedOrder | Error, storage = memoryStorage()) {
+function setup(
+  respond: (request: CheckoutRequest, attempt: number) => PlacedOrder | Error,
+  storage = memoryStorage(),
+  network: { online: boolean; reconnect?: () => void } = { online: true },
+) {
   const requests: CheckoutRequest[] = []
   const statuses = new Map<string, PlacedOrder['status']>()
   let keys = 0
@@ -50,6 +54,10 @@ function setup(respond: (request: CheckoutRequest, attempt: number) => PlacedOrd
     now: () => '2026-10-26T00:00:00Z',
     onCartChanged: () => void (cartChanges += 1),
     sleep: () => new Promise<void>((resolve) => sleepers.push(resolve)),
+    isOnline: () => network.online,
+    onOnline: (callback) => {
+      network.reconnect = callback
+    },
   })
 
   const phases = () => Object.fromEntries(store.getSnapshot()!.orders.map((o) => [o.groupType, o.phase.kind]))
@@ -136,18 +144,68 @@ describe('CheckoutStore', () => {
     expect(cartChanges()).toBe(2)
   })
 
-  it('resumes from storage: a request that was out becomes interrupted, and a confirming payment is checked', async () => {
+  it('resumes from storage: resends a request that was cut off, with the same key, and checks a confirming payment', async () => {
     const storage = memoryStorage()
-    const first = setup((r) => (r.groupType === 'lab_test' ? placed('o1') : new Promise(() => {}) as never), storage)
+    // The package request never answers: the page goes away while it's out
+    const first = setup((r) => (r.groupType === 'lab_test' ? placed('o1') : (new Promise(() => {}) as never)), storage)
     first.store.start([newOrder('lab_test'), newOrder('package')])
     await first.settle()
+    const cutOffKey = first.requests[1].idempotencyKey
 
-    // A new page load reads what the old one saved
+    // A new page load reads what the old one saved, and sorts it out by itself
     const second = setup(() => placed('o2', 'paid'), storage)
     second.statuses.set('o1', 'paid')
-    expect(second.phases()).toEqual({ lab_test: 'confirming', package: 'interrupted' })
+    await second.settle()
+    expect(second.requests.map((r) => [r.groupType, r.idempotencyKey])).toEqual([['package', cutOffKey]])
+    expect(second.phases()).toEqual({ lab_test: 'confirming', package: 'paid' })
+
     await second.wakePollers()
     expect(second.phases().lab_test).toBe('paid')
+  })
+
+  it('waits for a connection before resending, then resends on reconnect', async () => {
+    const storage = memoryStorage()
+    const first = setup(() => new Promise(() => {}) as never, storage)
+    first.store.start([newOrder('lab_test')])
+    await first.settle()
+
+    const network = { online: false, reconnect: undefined as (() => void) | undefined }
+    const second = setup(() => placed('o1', 'paid'), storage, network)
+    await second.settle()
+    expect(second.requests).toHaveLength(0)
+    expect(second.phases().lab_test).toBe('interrupted')
+
+    network.online = true
+    network.reconnect?.()
+    await second.settle()
+    expect(second.phases().lab_test).toBe('paid')
+  })
+
+  it('resends an order that failed because the customer was offline, once back online', async () => {
+    const network = { online: true, reconnect: undefined as (() => void) | undefined }
+    const { store, phases, settle, requests } = setup(
+      (_, attempt) => (attempt === 1 ? new ApiError('offline', '/checkout', 'offline') : placed('o1', 'paid')),
+      memoryStorage(),
+      network,
+    )
+    store.start([newOrder('lab_test')])
+    await settle()
+    expect(phases().lab_test).toBe('interrupted')
+
+    network.reconnect?.()
+    await settle()
+    expect(phases().lab_test).toBe('paid')
+    expect(requests[1].idempotencyKey).toBe(requests[0].idempotencyKey)
+  })
+
+  it('leaves a server error for the customer to retry', async () => {
+    const { store, phases, settle, requests } = setup(() => serverError())
+    store.start([newOrder('lab_test')])
+    await settle()
+    store.resume()
+    await settle()
+    expect(phases().lab_test).toBe('interrupted')
+    expect(requests).toHaveLength(1)
   })
 
   it('forgets the session when cleared', async () => {

@@ -27,7 +27,13 @@ export function orderStatusText(order: GroupOrder): OrderStatusText {
     case 'queued':
       return order.attempts === 0
         ? { tone: 'progress', title: 'Waiting', body: 'This order will be placed after the ones before it.' }
-        : { tone: 'progress', title: 'Waiting to try again', body: 'This order will be placed again shortly.' }
+        : order.idempotencyKey
+          ? {
+              tone: 'progress',
+              title: 'Checking on this order…',
+              body: "We're sending it again with the same details. If it already went through, you won't be charged twice.",
+            }
+          : { tone: 'progress', title: 'Trying again', body: 'This order will be placed again shortly.' }
     case 'submitting':
       return { tone: 'progress', title: 'Placing your order…', body: 'Please keep this page open.' }
     case 'confirming':
