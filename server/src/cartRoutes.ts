@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from 'express'
 import type { CartStore } from './cart/cartStore.js'
 import { ApiError } from './cart/errors.js'
+import { mergeGuestCart } from './cart/merge.js'
 import type { CheckoutItem, CheckoutRequest, OrderService } from './cart/orders.js'
-import type { GuestCartItem, PaymentMethod } from './cart/types.js'
+import type { GuestCartItem, PaymentMethod, Product } from './cart/types.js'
 import { mockNetwork } from './mock.js'
 import { parseMockConfig, sendInjectedFailure, type MockRules } from './mockRules.js'
 
@@ -10,6 +11,7 @@ interface CartRouterDeps {
   cart: CartStore
   orders: OrderService
   rules: MockRules
+  catalog: ReadonlyMap<string, Product>
   guestCart: GuestCartItem[]
 }
 
@@ -61,7 +63,7 @@ function parseCheckout(body: unknown): CheckoutRequest {
   return { groupType, items: parsed, paymentMethod: paymentMethod as PaymentMethod, idempotencyKey }
 }
 
-export function createCartRouter({ cart, orders, rules, guestCart }: CartRouterDeps): Router {
+export function createCartRouter({ cart, orders, rules, catalog, guestCart }: CartRouterDeps): Router {
   const router = Router()
 
   router.get('/cart', mockNetwork('cart'), rules.middleware('getCart'), (req, res) => {
@@ -90,6 +92,13 @@ export function createCartRouter({ cart, orders, rules, guestCart }: CartRouterD
   router.delete('/cart/items/:lineId', mockNetwork('cart'), rules.middleware('removeLine'), (req, res) => {
     cart.remove(String(req.params.lineId))
     send(req, res, 204)
+  })
+
+  // Items are checked one by one in mergeGuestCart, so one bad item doesn't block the rest
+  router.post('/cart/merge', mockNetwork('cart'), rules.middleware('mergeCart'), (req, res) => {
+    if (!isObject(req.body) || !Array.isArray(req.body.items)) throw badRequest('"items" must be an array')
+    const changes = mergeGuestCart(cart, catalog, req.body.items)
+    send(req, res, 200, { cart: cart.cart, changes })
   })
 
   router.post('/checkout', mockNetwork('checkout'), rules.middleware('checkout'), (req, res) => {

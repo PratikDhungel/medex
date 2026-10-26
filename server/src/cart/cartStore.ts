@@ -27,6 +27,15 @@ export class CartStore {
     return this.lines.find((line) => line.id === lineId)
   }
 
+  /** Lines for a product that's still offered, in cart order */
+  linesFor(productId: string): CartLine[] {
+    return this.lines.filter((line) => line.productId === productId && isAvailable(line.product))
+  }
+
+  add(line: CartLine) {
+    this.lines.push(structuredClone(line))
+  }
+
   private require(lineId: string): CartLine {
     const line = this.line(lineId)
     if (!line) throw new ApiError(404, 'line_not_found', 'This item is no longer in your cart.')

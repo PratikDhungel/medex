@@ -52,6 +52,7 @@ Seeded from `data/task2-cart.json`. The cart and orders are held in memory: they
 | GET    | `/api/cart`                |                                                                      | 200 `{ cart }`                               |
 | PATCH  | `/api/cart/items/:lineId`  | `{ quantity }` and/or `{ wellnessPricingId }`                        | 200 `{ cart }`, 400, 404, 409                |
 | DELETE | `/api/cart/items/:lineId`  |                                                                      | 204 (also when the line is already gone)     |
+| POST   | `/api/cart/merge`          | `{ items: guestCart }`                                               | 200 `{ cart, changes }`, 400                 |
 | POST   | `/api/checkout`            | `{ groupType, items: [{ lineId, quantity, wellnessPricingId? }], paymentMethod, idempotencyKey }` | 201 `{ orderId, status }`, 400, 402, 409, 500 |
 | GET    | `/api/orders/:orderId`     |                                                                      | 200 order, 404                               |
 
@@ -62,6 +63,8 @@ Errors are `{ code, message, details? }`. Notable codes:
 - `option_unavailable` (409): the chosen wellness duration isn't offered.
 - `cart_changed` (409): the checkout items don't match the cart any more. `details.mismatches` lists each line with a reason (`not_in_cart`, `wrong_group`, `unavailable`, `quantity_changed`, `option_changed`, `price_unknown`).
 - `idempotency_key_reused` (409): the key was already used for a different checkout.
+
+**Guest cart merge.** Each guest item is merged on its own, so one bad item never blocks the rest. Quantities are never added: the larger one wins, which also makes the merge safe to repeat. `changes` has one or more entries per item, each with a `kind`: `added`, `kept_larger_quantity`, `already_in_cart`, `duration_applied`, `duration_not_offered`, `quantity_capped`, `not_offered` or `invalid_item` (see `src/cart/merge.ts` for the fields). The rules and the reasons for them are in the root README.
 
 **Idempotency.** The first successful checkout for a key is stored. Sending the same request with the same key again returns the same order (with its current status) and never creates another. Failed requests store nothing, so the key can be retried.
 

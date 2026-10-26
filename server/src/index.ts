@@ -39,7 +39,8 @@ app.get('/api/service', mockNetwork('services'), (_req: Request, res: Response) 
   res.json(data.services)
 })
 
-app.use('/api', createCartRouter({ cart, orders, rules, guestCart: cartData.guestCart }))
+const catalog = new Map(cartData.catalog.map((product) => [product.id, product]))
+app.use('/api', createCartRouter({ cart, orders, rules, catalog, guestCart: cartData.guestCart }))
 
 // Unknown API routes
 app.use('/api', (_req: Request, res: Response) => {
