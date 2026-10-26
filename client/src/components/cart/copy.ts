@@ -87,3 +87,11 @@ export function removeFailureText(error: unknown): string {
   }
   return "Something went wrong on our side, so this item wasn't removed. Please try again."
 }
+
+/** Why logging in (and bringing the guest cart over) didn't work */
+export function logInFailureText(error: unknown): string {
+  if (error instanceof ApiError && error.kind === 'offline') {
+    return "You're offline. Log in once you're back online; the items on this device are safe."
+  }
+  return "We couldn't log you in and bring your items over. Nothing has changed, so it's safe to try again."
+}

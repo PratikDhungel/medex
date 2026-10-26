@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import type { RawCart, RawGuestCartItem, RawMergeChange } from '@/domain/cart/raw'
+import type { RawCart, RawCartProduct, RawGuestCartItem, RawMergeChange } from '@/domain/cart/raw'
 import { ApiError, requestJson } from './client'
 
 // The cache holds the cart exactly as the server sent it. Components derive
@@ -62,3 +62,14 @@ export async function mergeGuestCart(items: RawGuestCartItem[]): Promise<MergeRe
     changes: changes.filter((change): change is RawMergeChange => isObject(change) && typeof change.kind === 'string'),
   }
 }
+
+/** Products a customer can add. Used to show a guest's cart, which holds only product ids. */
+export const cartCatalogQuery = queryOptions({
+  queryKey: ['cart-catalog'],
+  queryFn: async ({ signal }) => {
+    const body = await requestJson('/catalog', { signal })
+    if (!Array.isArray(body)) throw new ApiError('invalid', '/catalog', 'The server sent an unexpected catalog')
+    return body.filter(isObject) as RawCartProduct[]
+  },
+  staleTime: Infinity,
+})

@@ -52,6 +52,7 @@ Seeded from `data/task2-cart.json`. The cart and orders are held in memory: they
 | GET    | `/api/cart`                |                                                                      | 200 `{ cart }`                               |
 | PATCH  | `/api/cart/items/:lineId`  | `{ quantity }` and/or `{ wellnessPricingId }`                        | 200 `{ cart }`, 400, 404, 409                |
 | DELETE | `/api/cart/items/:lineId`  |                                                                      | 204 (also when the line is already gone)     |
+| GET    | `/api/catalog`             |                                                                      | 200 products the customer can add            |
 | POST   | `/api/cart/merge`          | `{ items: guestCart }`                                               | 200 `{ cart, changes }`, 400                 |
 | POST   | `/api/checkout`            | `{ groupType, items: [{ lineId, quantity, wellnessPricingId? }], paymentMethod, idempotencyKey }` | 201 `{ orderId, status }`, 400, 402, 409, 500 |
 | GET    | `/api/orders/:orderId`     |                                                                      | 200 order, 404                               |
@@ -72,7 +73,7 @@ Errors are `{ code, message, details? }`. Notable codes:
 
 ### Failure injection (dev panel)
 
-The query flags above also work here, with the resource names `cart`, `checkout` and `orders`. To fail one specific call, set rules at runtime:
+The query flags above also work here, with the resource names `cart`, `checkout`, `orders` and `catalog`. To fail one specific call, set rules at runtime:
 
 | Method | Path                     | Description                                          |
 | ------ | ------------------------ | ---------------------------------------------------- |

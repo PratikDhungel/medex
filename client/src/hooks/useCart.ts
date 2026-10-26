@@ -56,10 +56,10 @@ export function useCart(): CartState {
   }
 }
 
-/** Item count for the header, including changes still being saved */
-export function useCartItemCount(): number | undefined {
+/** Item count for the header, including changes still being saved. Only fetched for a logged-in customer. */
+export function useCartItemCount(enabled: boolean): number | undefined {
   const local = useLocalQuantities()
-  const { data } = useQuery(cartQuery)
+  const { data } = useQuery({ ...cartQuery, enabled })
   return useMemo(
     () => (data ? normaliseCart(withQuantities(data, local.quantities)).itemCount : undefined),
     [data, local.quantities],

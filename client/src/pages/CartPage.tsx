@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
+import { cartCatalogQuery } from '@/api/cart'
+import { GuestCartView } from '@/components/account/GuestCartView'
+import { MergeNotice } from '@/components/account/MergeNotice'
 import { CartView } from '@/components/cart/CartView'
 import { lineTitle } from '@/components/cart/copy'
 import { focusTargetAfterRemoval } from '@/components/cart/focus'
@@ -7,6 +11,7 @@ import { sessionSummaryText } from '@/components/checkout/copy'
 import { checkoutHref } from '@/components/checkout/links'
 import { hasUnresolved, summariseSession } from '@/domain/checkout/machine'
 import { useCart } from '@/hooks/useCart'
+import { useAccount, useAccountStore } from '@/hooks/useAccount'
 import { useCartActions } from '@/hooks/useCartActions'
 import { useCheckoutSession, useCheckoutStore } from '@/hooks/useCheckout'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -22,6 +27,41 @@ type FocusRequest = { target: string | null }
 
 export function CartPage() {
   useDocumentTitle('Your cart')
+  const { account } = useAccount()
+  return account === 'guest' ? <GuestCart /> : <CustomerCart />
+}
+
+function GuestCart() {
+  const { guestCart, guestCartFailed } = useAccount()
+  const account = useAccountStore()
+  const catalog = useQuery({ ...cartCatalogQuery, enabled: (guestCart?.length ?? 0) > 0 })
+  const products = catalog.data
+    ? new Map(catalog.data.flatMap((product) => (typeof product.id === 'string' ? [[product.id, product] as const] : [])))
+    : undefined
+
+  const retry = () => {
+    // Failures show through guestCartFailed
+    account.ensureGuestCart().catch(() => {})
+    if (catalog.isError) void catalog.refetch()
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeading title="Your cart">You're browsing as a guest. Your items are saved on this device.</PageHeading>
+      <GuestCartView
+        items={guestCart}
+        products={products}
+        failed={guestCartFailed || catalog.isError}
+        retrying={catalog.isFetching}
+        onRetry={retry}
+      />
+    </div>
+  )
+}
+
+function CustomerCart() {
+  const { mergeNotice } = useAccount()
+  const account = useAccountStore()
   const { status, cart, local, retrying, retry, setQuantity, dismissQuantityFailure } = useCart()
   const actions = useCartActions()
   const online = useOnline()
@@ -57,6 +97,7 @@ export function CartPage() {
   return (
     <div ref={container} className="space-y-6">
       <PageHeading title="Your cart">Each group in your cart is booked and paid for separately.</PageHeading>
+      {mergeNotice && <MergeNotice changes={mergeNotice.changes} onDismiss={() => account.dismissMergeNotice()} />}
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>

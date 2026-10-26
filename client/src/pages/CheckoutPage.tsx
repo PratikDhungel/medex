@@ -2,6 +2,7 @@ import { CloudOff, ShoppingCart } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { failureMessage } from '@/api/failureMessage'
+import { LogInButton } from '@/components/account/LogInButton'
 import { ReviewView } from '@/components/checkout/ReviewView'
 import { SessionView } from '@/components/checkout/SessionView'
 import { orderHeadingId } from '@/components/checkout/links'
@@ -12,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { CartGroup } from '@/domain/cart/model'
 import { checkoutItems } from '@/domain/cart/summary'
 import type { PaymentMethod } from '@/domain/checkout/model'
+import { useAccount } from '@/hooks/useAccount'
 import { useCart } from '@/hooks/useCart'
 import { useCheckoutSession, useCheckoutStore } from '@/hooks/useCheckout'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -28,6 +30,21 @@ const orderFrom = (group: CartGroup, paymentMethod: PaymentMethod) => ({
 
 export function CheckoutPage() {
   useDocumentTitle('Checkout')
+  const { account } = useAccount()
+  if (account === 'guest') {
+    return (
+      <div className="space-y-6">
+        <PageHeading title="Checkout" />
+        <StatePanel icon={ShoppingCart} title="Log in to book" action={<LogInButton />}>
+          Booking needs an account. The items saved on this device will be added to your cart.
+        </StatePanel>
+      </div>
+    )
+  }
+  return <CustomerCheckout />
+}
+
+function CustomerCheckout() {
   const session = useCheckoutSession()
   const store = useCheckoutStore()
   const { status, cart, retrying, retry } = useCart()

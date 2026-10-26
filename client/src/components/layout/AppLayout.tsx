@@ -1,6 +1,9 @@
 import { ShoppingCart } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { LogInButton } from '@/components/account/LogInButton'
+import { Button } from '@/components/ui/button'
+import { useAccount, useAccountStore } from '@/hooks/useAccount'
 import { useCartItemCount } from '@/hooks/useCart'
 import { cn } from '@/lib/utils'
 
@@ -13,13 +16,19 @@ export function AppLayout() {
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
   const previousPath = useRef(pathname)
-  const cartCount = useCartItemCount()
+  const { account, guestCart } = useAccount()
+  const accountStore = useAccountStore()
+  const customerCount = useCartItemCount(account === 'customer')
+  const cartCount =
+    account === 'customer' ? customerCount : guestCart?.reduce((sum, item) => sum + item.quantity, 0)
 
   useEffect(() => {
     // Only page changes: the explorer's filters change the query string, not the path
     if (previousPath.current === pathname) return
     previousPath.current = pathname
-    mainRef.current?.querySelector<HTMLElement>('h1')?.focus()
+    // A page can point focus somewhere more useful than its heading (e.g. what logging in changed)
+    const target = mainRef.current?.querySelector<HTMLElement>('[data-autofocus]') ?? mainRef.current?.querySelector<HTMLElement>('h1')
+    target?.focus()
   }, [pathname])
 
   return (
@@ -29,7 +38,14 @@ export function AppLayout() {
           <Link to="/" className="rounded-sm font-accent text-xl font-semibold tracking-tight outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
             medex
           </Link>
-          <nav aria-label="Main">
+          <nav aria-label="Main" className="flex items-center gap-2">
+            {account === 'guest' ? (
+              <LogInButton size="sm" variant="ghost" />
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => accountStore.logOut()}>
+                Log out
+              </Button>
+            )}
             <NavLink
               to="/cart"
               className={({ isActive }) =>

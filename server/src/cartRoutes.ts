@@ -111,6 +111,11 @@ export function createCartRouter({ cart, orders, rules, catalog, guestCart }: Ca
     send(req, res, 200, order)
   })
 
+  /** Products a customer can add; the client uses it to show a guest's cart, which holds only product ids */
+  router.get('/catalog', mockNetwork('catalog'), (_req, res) => {
+    res.json([...catalog.values()])
+  })
+
   // Dev-only controls for the mock, used by the client's dev panel
   router.get('/__mock/config', (_req, res) => {
     res.json(rules.current)
