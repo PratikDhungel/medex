@@ -5,8 +5,11 @@ export interface FailureMessage {
   body: string
 }
 
-/** A plain-language message for why loading failed, most actionable cause first */
-export function failureMessage(errors: readonly Error[]): FailureMessage {
+/**
+ * A plain-language message for why loading failed, most actionable cause
+ * first. `subject` names what failed to load, e.g. "your cart".
+ */
+export function failureMessage(errors: readonly Error[], subject = 'the latest services'): FailureMessage {
   const kinds = new Set(errors.map((error) => (error instanceof ApiError ? error.kind : 'network')))
 
   if (kinds.has('offline')) {
@@ -22,7 +25,7 @@ export function failureMessage(errors: readonly Error[]): FailureMessage {
     }
   }
   return {
-    title: "We couldn't read the latest services",
+    title: `We couldn't read ${subject}`,
     body: 'Please try again. If it keeps happening, the data may be updating.',
   }
 }

@@ -49,3 +49,16 @@ These are exposed to Tailwind as `bg-brand-from`, `to-brand-to`, `text-brand-for
 ### Button variants
 
 `default` is the brand gradient pill. Also available: `solid` (flat primary), `secondary`, `outline`, `ghost`, `link`, `destructive`; sizes `xs`, `sm`, `default`, `lg` and `icon*`.
+
+## Where things live
+
+| Folder | What's in it |
+| --- | --- |
+| `src/pages/` | One component per route: explorer (`/`), cart, checkout, not found |
+| `src/components/` | UI by feature: `explorer/`, `filters/`, `cart/`, `checkout/`, `account/`, `dev/` (the Mock API panel), plus shadcn `ui/` |
+| `src/domain/` | Pure logic with no React or network: Task 1's catalog and filter engine; `cart/` (normalising the cart, totals, summary) and `checkout/` (the order state machine, saved sessions) |
+| `src/state/` | Client state that outlives components, as small subscribable classes: quantity sync, cart write ordering, the checkout runner, the account and guest cart |
+| `src/hooks/` | React glue: queries, and one store instance per QueryClient |
+| `src/api/` | Fetching, errors (`ApiError`) and one module per resource |
+
+Customer-facing wording is kept in `copy.ts` files next to the components that use it. See the root README for the decisions behind each part.

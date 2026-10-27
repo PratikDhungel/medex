@@ -14,7 +14,7 @@ function queryString(req: Request, key: string): string | undefined {
 /**
  * Simulates a real network on demand, per request:
  *   ?mockDelay=<ms>                     replace the default latency (0 disables it)
- *   ?mockFail=<all|categories|providers|services>[,...]
+ *   ?mockFail=<all|categories|providers|services|cart|checkout|orders>[,...]
  *                                       respond 500 for the listed resources
  *   ?mockFailRate=<0..1>                fail randomly with that probability
  *

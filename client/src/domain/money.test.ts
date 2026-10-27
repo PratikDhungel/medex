@@ -29,11 +29,11 @@ describe('formatMoney', () => {
 
   it('rounds to two decimals only here', () => {
     expect(formatMoney(5970.6, 'THB')).toBe('THB\u00a05,970.60')
-    expect(formatMoney(0.1 + 0.2, 'INR')).toBe('₹0.30')
+    expect(formatMoney(0.1 + 0.2, 'INR')).toBe('INR\u00a00.30')
   })
 
   it('keeps each currency', () => {
     expect(formatMoney(1800, 'NPR')).toBe('NPR\u00a01,800')
-    expect(formatMoney(1800, 'INR')).toBe('₹1,800')
+    expect(formatMoney(1800, 'INR')).toBe('INR\u00a01,800')
   })
 })

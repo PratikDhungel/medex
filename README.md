@@ -1,11 +1,15 @@
-# medex: Service Explorer (Task 1)
+# medex: MedEx take-home exercises
 
-Browse and filter the MedEx service catalogue: 3,200 services from 67 providers, grouped into provider cards. Filter counts update live, prices never mix currencies, and the whole view lives in the URL.
+Two exercises from the MedEx senior frontend take-home, built in one app:
+
+- **[Task 1: Service Explorer](#task-1-service-explorer)** (`/`): browse and filter 3,200 services from 67 providers, with live filter counts, prices that never mix currencies, and the whole view in the URL.
+- **[Task 2: Multi-provider cart and split checkout](#task-2-multi-provider-cart-and-split-checkout)** (`/cart`, `/checkout`): a cart grouped by service type and paid in several currencies, optimistic quantity changes, split checkout where each group is its own order, partial failures, double-charge prevention, reload safety and a guest cart merged on login.
 
 ```
 medex/
-├── client/   # React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, Vitest
-└── server/   # Express 5 + TypeScript mock API; data in server/data/task1-service-explorer.json
+├── client/   # React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, React Router, Vitest
+└── server/   # Express 5 + TypeScript mock API, Vitest
+              # data: server/data/task1-service-explorer.json, server/data/task2-cart.json
 ```
 
 ## Getting started
@@ -17,18 +21,18 @@ npm install    # installs root tooling, then server/ and client/ dependencies
 npm run dev    # starts the API (http://localhost:3001) and the app (http://localhost:5173)
 ```
 
-Open http://localhost:5173. Vite proxies `/api/*` to the Express server.
+Open http://localhost:5173 for the explorer, or http://localhost:5173/cart for the cart. Vite proxies `/api/*` to the Express server.
 
 | Root script     | What it does                                  |
 | --------------- | --------------------------------------------- |
 | `npm run dev`   | Run server and client together (concurrently) |
 | `npm run build` | Build server, then client                     |
 | `npm run lint`  | Lint the client                               |
-| `npm test`      | Run client unit tests (Vitest)                |
+| `npm test`      | Run server, then client unit tests (Vitest)   |
 
 The root `package.json` only holds scripts; it is not an npm workspace. See [client/README.md](client/README.md) and [server/README.md](server/README.md) for each app on its own.
 
-### Trying the loading and error states
+### Trying the loading and error states (Task 1)
 
 The mock API is slow or fails on demand. Add these to the app's URL; the client forwards them to every API request:
 
@@ -39,6 +43,10 @@ The mock API is slow or fails on demand. Add these to the app's URL; the client 
 | `/?mockFail=categories`                | Partial data: results with a notice, category filter disabled      |
 | `/?mockFailRate=0.5`                   | Random failures, retried automatically                             |
 | DevTools → Network → Offline           | Offline state before loading; an offline banner after loading      |
+
+# Task 1: Service Explorer
+
+Browse and filter the MedEx service catalogue: 3,200 services from 67 providers, grouped into provider cards. Filter counts update live, prices never mix currencies, and the whole view lives in the URL.
 
 ## What the brief asked for, and where it stands
 
@@ -190,7 +198,7 @@ Everything stays under 100 ms, and layout shift is well under the 0.1 "good" thr
 
 ## Tests
 
-`npm test` runs 188 tests in 24 files (Vitest, Node environment). Most of them run against the real `task1-service-explorer.json`, not just fixtures.
+Task 1 added 188 tests in 24 files (Vitest, Node environment). Most of them run against the real `task1-service-explorer.json`, not just fixtures.
 
 - **Pricing and money:**
   - discount and charge types
@@ -220,7 +228,7 @@ Interactions (clicking, typing, Back and Forward, the drawer) were checked in he
 - **Dark mode.** The theme has dark tokens, but the page hasn't been designed or checked in dark mode.
 - **Cleaning the URL on load.** Unknown or invalid params are ignored at once, but only disappear from the address bar at the next change, to avoid adding a history entry the user didn't ask for.
 - **Smarter search.** There's no typo tolerance, stemming or synonyms; relevance is simple word scoring.
-- **Number formatting** is English (`en`) only.
+- **Number formatting** is English (`en`) only. Since Task 2, amounts always show the currency code ("INR 1,800", not "₹1,800"), in the explorer too.
 - **Server-side filtering and pagination**, which a much larger catalogue would need.
 
 ## Where AI tools were used
@@ -261,3 +269,274 @@ Problems found in `server/data/task1-service-explorer.json`. The client never ed
 | "Free Dental Consultation" has a price of 0 with no discount | A legitimate price, shown as "Free". |
 | 31 discounted prices where the service charge cancels out the discount (e.g. "Home HbA1c Test": listed NPR 5,690, final NPR 5,724.50) | The original price is only struck through when the final price is actually lower, so no saving is advertised that isn't there. |
 | No visible service has "Ultrasound" in its title (the one that does, "Thyroid Ultrasound", is hidden) | Searching "ultrasound" still finds services through their category name. |
+
+---
+
+# Task 2: Multi-provider cart and split checkout
+
+> "I put a lab test from one clinic, a facial from a spa, and a check-up package from a hospital in my cart. Then I tried to pay."
+
+The cart groups services by type. Each group can hold several providers and currencies, and each group is booked and paid as its own order, by card or at the clinic. The hard parts are what happens when things go wrong: a quantity change the server refuses, an order whose response never arrives, a tab closed mid-payment, a guest cart that overlaps the account's.
+
+## Trying it
+
+`npm run dev`, then open http://localhost:5173/cart.
+
+1. **A first visit is a guest's.** The guest cart from the data file is "saved on this device". Press **Log in** to merge it into the account's cart; a notice says exactly what changed.
+2. **The cart:** change quantities (try tapping "+" quickly), pick the facial's duration, remove the item the provider withdrew.
+3. **Checkout:** "Book all 3 groups", choose card or pay at the clinic for each, then "Place 3 orders".
+4. **Make it fail:** open **Mock API** (bottom-left) and pick a scenario, e.g. "Next package checkout: card declined" or "order made, response lost", before placing the orders. Then retry what failed. **Reset demo** in the same panel starts the whole story again.
+5. **Reload safety:** reload, or close the tab and reopen `/checkout`, while orders are being placed. Use "Everything slow" in the panel to give yourself time.
+
+The server cart, orders and rules live in memory: restarting the server also resets them.
+
+## What the brief asked for, and where it stands
+
+✅ done · ◑ done with a caveat · ✗ not done
+
+| Requirement | Status | Notes |
+| --- | --- | --- |
+| Mock API: the 7 endpoints, realistic latency, data mapped rather than imported | ✅ | Express, 300 ms default latency. Plus `GET /api/catalog` (to show a guest's cart) and dev-only `/__mock/*` controls. See [server/README.md](server/README.md). |
+| Make a specific call fail or slow down on demand | ✅ | The Mock API panel, see [Trying the failure cases](#trying-the-failure-cases). Task 1's query flags still work. |
+| `POST /checkout` honours the idempotency key | ✅ | Same key and request → the same order (with its current status); same key, different request → 409. |
+| Cart grouped by type, a subtotal per currency, no grand total across currencies | ✅ | |
+| A summary that still helps the customer understand what they'll pay | ✅ | One total per currency, how many separate bookings, what isn't priced yet. |
+| Optimistic quantity changes, rolled back with a reason; five quick taps end right, with no flicker or racing requests | ✅ | Verified in a real browser: five taps sent two ordered requests (2, then 6). See [Changing quantities](#changing-quantities). |
+| Wellness needs a duration before its group can be checked out; never counted as zero | ✅ | |
+| Unavailable items clearly marked, can't be checked out, easy to remove | ✅ | |
+| Split checkout: one group or everything; each group a separate order with its own payment method | ✅ | |
+| Partial failure: nothing lost or charged twice; clear about what succeeded; retry only what failed; no duplicate orders | ✅ | Verified with an order created on the server whose response was replaced by a 500: the retry returned the same order. |
+| Reload safety: the true state of each order after a refresh or a closed tab | ✅ | Verified by closing a real tab mid-request. See [Reload safety](#reload-safety). |
+| Guest cart merged on login, each overlap handled and explained | ✅ | See [Guest cart merge](#guest-cart-merge). |
+| States: loading, empty, slow, offline, error | ✅ | Plus a failed refresh that keeps the cart on screen. |
+| Every action keyboard-accessible; focus managed on removal and checkout steps | ◑ | Built in and checked in a headless browser with scripted focus; no full keyboard-only or screen-reader walkthrough. See [What was left out](#what-was-left-out-task-2). |
+| Contrast | ◑ | New colours (amber and emerald status text) haven't been measured. |
+| Performance with realistic data volume | ◑ | Totals are recomputed only when the cart changes, but large carts haven't been measured. |
+| State machine in the README; how double charges are prevented; explaining several orders | ✅ | See [Checkout](#checkout-the-state-of-each-order). |
+| README, tests for the most important logic | ✅ | 384 tests in total; see [Tests](#tests-task-2). |
+
+## How it's put together
+
+**Stack additions, and why:**
+
+- **React Router** for the three pages. Task 1's explorer keeps its own query-string state; the router only owns the path.
+- **No separate state library.** Server data stays in TanStack Query, as in Task 1. The three pieces of client state that outlive a component are small classes with `subscribe`/`getSnapshot`, read through `useSyncExternalStore`. They have no React in them, so they can be tested with fake API calls and hand-resolved promises. A library like Zustand would have worked too; it wasn't needed.
+
+**Where each piece of state lives:**
+
+| State | Where | Why there |
+| --- | --- | --- |
+| The account's cart, exactly as the server sent it | TanStack Query cache (`cartKey`) | Server data. Components derive the clean model with `normaliseCart`, so optimistic edits work on the server's own shape. |
+| Quantities being saved, and why a change failed | `QuantitySync` (`client/src/state/quantitySync.ts`), one per QueryClient | Needs to queue requests per line and survive re-renders; layered over the cache rather than written into it. |
+| The order cart responses are applied in | `CartWrites` (`client/src/state/cartWrites.ts`) | Shared by every cart write, so an older response never overwrites a newer one. |
+| The checkout session: orders, keys, phases | `CheckoutStore` (`client/src/state/checkoutStore.ts`) + `localStorage` | Must outlive the page component (leaving mid-checkout neither stops nor duplicates it) and the page itself (reload safety). |
+| Guest or customer, and the device's guest cart | `AccountStore` (`client/src/state/accountStore.ts`) + `localStorage` | Device state that the header, cart and checkout all read. |
+| Payment methods while reviewing, focus targets, announcements | Component state | Only that page needs them. The groups being booked are in the URL, so a reload keeps them. |
+
+The rules (prices, group readiness, the checkout state machine, key rules, error classification) are pure functions in `client/src/domain/cart` and `client/src/domain/checkout`, separate from the stores that run them.
+
+## How the client reads the cart
+
+The client never takes the cart's numbers on trust (`client/src/domain/cart/`). It keeps the server's groups, because each group is checked out as one order, but recomputes every count, line total and subtotal from the lines. Anything odd is recorded in the cart's `issues` list, as in Task 1.
+
+- **A price is either known or blocking, never zero.** Each line is *priced*, *blocked* (price unknown) or *unavailable* (service removed). A blocked line stops its group from being checked out and is counted in the summary as "not priced yet"; it is never added to a total. Lines are blocked for: a wellness service with no duration chosen; a wellness service with no usable durations; a missing, negative or malformed price or currency; or a quantity that isn't a whole number of at least 1.
+- **Wellness prices come only from the chosen duration.** A fixed `price` on a wellness service is ignored (and flagged), and the `priceUnknown` flag isn't relied on. Duration options without an id, a positive duration or a valid price are dropped. A selected duration the service no longer offers counts as not chosen.
+- **Removed services are left out of orders, not blocking.** A removed service in a group that can otherwise be booked doesn't hold the group back: it is shown as unavailable and left out of that group's order. A group with only removed services (the `unknown` group in the data) isn't an order at all and is listed last.
+- **Amounts always show the currency code** ("INR 23,009.50", not "₹23,009.50"). With up to three currencies side by side, a mix of symbols and codes is harder to compare. This also changed the explorer from Task 1, which used to show ₹.
+- **The summary never adds currencies.** It shows one total per currency across all groups, how many separate orders the cart becomes, and how many items aren't priced yet.
+- **Smaller tidying:** lower-case currency codes are accepted (`thb` → THB), titles are trimmed, a line with no id is skipped (nothing can be done with it), and server subtotals that disagree with the lines are flagged.
+## Changing quantities
+
+Quantity changes are optimistic (`client/src/state/quantitySync.ts`). The new number shows the moment "+" or "−" is tapped, and the line's price and the group and cart totals update with it.
+
+- **One request per line at a time, newest value wins.** While a change is being saved, further taps only move the target; when the request returns, the latest target is sent. Five quick taps from 1 send two requests (2, then 6), in order, and the screen goes 2, 3, 4, 5, 6 without jumping back. Tapping back to the saved value sends nothing more. Lines don't wait for each other.
+- **Out-of-order responses can't undo anything.** Every write returns the whole cart, and responses can arrive in any order. A response to an earlier request never replaces one to a later request (`client/src/state/cartWrites.ts`), and quantities the customer touched stay on top of the cached cart until a reload, made once everything has settled, confirms them.
+- **When the server refuses, the line goes back and says why.** A 409 or 500 restores the last quantity the server accepted, and the line shows (and announces) the reason, e.g. "You can book up to 10 of one service at a time. It's back to 10."
+- **When the outcome is unknown, the cart is reloaded instead.** If the connection drops mid-request, the change may or may not have been saved, so rolling back could be just as wrong as keeping it. The cart is reloaded and the line says so.
+- **Offline:** steppers are inactive, and the banner explains that changes wait until the connection is back.
+- **No client-side maximum.** The server owns the booking limit; the client shows its 409 rather than duplicating the rule.
+- **Keyboard:** "−" at 1 is marked `aria-disabled` rather than `disabled`, so focus isn't thrown back to the top of the page. Going below 1 means removing the item, which gets its own button.
+## Choosing a duration and removing items
+
+- **Wellness durations are a radio group** ("60 min · THB 1,800"), labelled with the service's name for screen readers, so arrow keys move between them. The choice shows at once; the price, group status and summary update when the server confirms it. Until then the price says "Price shown once you choose a duration" and is never counted as zero. If the duration is no longer offered (409), the line says so and the cart is reloaded.
+- **Every line has a Remove button**, outlined for services the provider removed, since removing is the only thing left to do with them. A removal isn't optimistic: the line stays, showing "Removing…", until the server confirms, so a failure doesn't make a removed line reappear. There's no confirmation dialog or undo: the item can simply be added again.
+- **Focus after a removal** goes to the next line in the group, else the previous one, else the next (or previous) group's heading, else the page heading once the cart is empty. The removal is also announced ("CBC Profile was removed from your cart.").
+- **No stale reloads.** Both actions cancel any cart reload in flight first, and take part in the same response ordering as quantity changes, so an older response can't bring back a removed line or an old duration.
+## Checkout: the state of each order
+
+Each group in a checkout becomes its own order, paid on its own, so each has its own state (`client/src/domain/checkout/machine.ts`). "Pay for everything" submits the groups one after another, in the cart's order, and carries on past a failure, so one problem never holds up the rest.
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> submitting: send POST /checkout<br/>(saved first)
+    submitting --> confirming: 201, card
+    submitting --> booked: 201, pay at clinic
+    submitting --> paid: 201, already paid
+    submitting --> interrupted: 500 / no response / offline / page reloaded
+    submitting --> declined: 402
+    submitting --> cart_changed: 409
+    submitting --> rejected: 400 / key reused
+    confirming --> paid: GET /orders → paid
+    confirming --> payment_failed: GET /orders → failed
+    interrupted --> queued: retry, SAME key
+    declined --> queued: retry, NEW key
+    payment_failed --> queued: retry, NEW key
+    cart_changed --> queued: accept the cart as it is now, NEW key
+    paid --> [*]
+    booked --> [*]
+    rejected --> [*]
+```
+
+### What the customer sees
+
+- **From the cart:** each ready group has its own "Book" button, and the summary offers "Book all 3 groups" (or "Book the 2 ready groups" while one still needs a duration). The choice goes in the URL (`/checkout?groups=package,lab_test`), so a reload keeps it.
+- **Review:** each group is shown as "Order 1: Packages", with its items, providers, totals per currency and its own payment method (card, or pay at the clinic; insurance is card only). The page says plainly that these are separate orders and that one problem won't affect the others. Nothing is sent until "Place 3 orders".
+- **Results:** one card per order, in plain terms of money and booking: "Paid and booked", "Booked. Pay at the clinic", "Your card was declined. No order was placed and you haven't been charged", "We couldn't confirm this order. Trying again is safe: you will never be charged twice for it." Orders that exist show a short reference. A sentence at the top ("2 of 3 orders done, 1 needs your attention") is announced to screen readers as it changes.
+- **Retry only what failed:** "Try again" appears only on orders that can be retried, plus "Try all 2 again" when there are several. After a decline or a failed payment the customer can switch to paying at the clinic first. If the cart changed, they can place the order again with the cart as it is now.
+- **Leaving:** while an order is in progress or its outcome is unknown, the page offers "Back to cart" and keeps the checkout; the cart shows a banner linking back to it, and won't start another checkout until it's resolved. Once everything is settled, "Done" (or "Leave the rest in my cart") clears it. Checkout runs outside the page component, so leaving mid-checkout neither stops it nor starts a second copy on return.
+- **Focus:** placing the orders moves focus to the results heading; retrying an order moves it to that order's heading, since the button that was pressed disappears.
+- **No real card entry.** "Card" is a choice, not a form: a real integration would use the payment provider's hosted fields, which is out of scope for a mock.
+
+### How double charges are prevented
+
+- **Every attempt carries an idempotency key, and the key outlives uncertainty.** If we don't know whether an order was created (a 500, a dropped connection, the tab closed mid-request), the retry reuses the same key. The server either creates the order or returns the one it already made; it never makes a second one.
+- **A key is spent only when we know no usable order came of it:** a declined card (402), a payment that failed after the order was made, a cart that changed (409), or a request the server refused (400). The next attempt is then a genuinely new order, with a new key.
+- **The payment method is locked while a key is outstanding.** The first attempt may already have created an order by card; switching to "pay at clinic" with the same key would be a different request, which the server rightly refuses. Once the attempt is known to have failed, the method can change.
+- **Retry only what failed.** Succeeded orders are never resubmitted; the retry action exists only for interrupted, declined and failed orders.
+- **Late or duplicate events are ignored.** The reducer only accepts events that fit an order's current phase, so a double click or a response arriving after a reload can't move an order backwards.
+- **One request at a time.** Orders are submitted one after another, which also keeps progress easy to follow.
+
+### Reload safety
+
+The checkout session (orders, items, payment methods, keys and phases) is saved to `localStorage` on every change, and **before** each request is sent (`client/src/domain/checkout/storage.ts`). If the page reloads or the tab is closed mid-checkout:
+
+- an order that had a request out comes back as *interrupted*, and is **resent automatically with the same key** as soon as the page loads. The server returns the order if the first request made it, or makes it now; either way the page shows the truth without the customer doing anything ("Checking on this order… If it already went through, you won't be charged twice.");
+- orders the customer had already asked to place but that hadn't been sent yet carry on in turn: they pressed "Place 3 orders", so restarting the checkout would be the surprise;
+- an order waiting for its card payment carries on being checked with `GET /orders/:id`;
+- finished orders show as finished; nothing starts again from scratch.
+
+If the page loads offline, nothing is resent until the connection is back; orders that failed *because* the customer was offline are also resent on reconnect. Server errors (500) are left for the customer to retry, so a failing server isn't hammered.
+
+**Tested by closing a real tab mid-request** (headless Edge, the package request held for 3 s by a mock rule): the saved session had `package: submitting` with its key and no response; the new tab resent that same key without a click, got back the order the first request had made (a second order would have been refused, since the package's items had already left the cart), then placed the two remaining orders.
+
+**Two tabs** aren't synchronised: each tab runs the checkout it loaded. Because every resend uses the saved key, two tabs resolving the same order still produce one order. A real server must also handle two requests with the same key arriving at once (by locking on the key); the mock processes requests one at a time, so it doesn't need to.
+
+A session that can't be read (corrupt, or an unknown version) is dropped rather than guessed at. If storage isn't available at all (some private modes), checkout still works but can't survive a reload.
+## Guest cart merge
+
+When a guest logs in, the cart saved on their device is merged into their account's cart (`POST /api/cart/merge`, logic in `server/src/cart/merge.ts`). Every item is merged on its own, so one bad item never blocks the rest, and the server reports each outcome in `changes` so the customer can be told exactly what happened.
+
+### What the customer sees
+
+There are no real accounts in this exercise, so logging in is pretend (`client/src/state/accountStore.ts`), but the moment a guest becomes a customer is real:
+
+- **A first visit is a guest's.** The guest cart from the data file stands in for what they saved earlier, and is stored on the device (`localStorage`). The cart page lists it ("Saved on this device"), resolving product names through `GET /api/catalog` because a guest cart holds only product ids. Booking asks the guest to log in.
+- **Logging in merges, then logs in.** If the merge fails, nothing changes: the guest stays a guest with their items, and is told it's safe to try again. It is, because the merge keeps the larger quantity and so can be repeated.
+- **Then the cart opens with a "What changed" notice**, one sentence per case, and focus moves to it so a screen reader announces it first. The device's cart is emptied, since its items now live in the account.
+
+### The cases in the data
+
+The guest cart in `server/data/task2-cart.json` overlaps the account's cart in four ways:
+
+| Guest item | Account's cart | What happens | What the customer is told |
+| --- | --- | --- | --- |
+| Liver Function Profile ×3 | Same test ×2 | The line keeps the **larger** quantity: 3. | "Liver Function Profile: kept 3 from before you logged in (your account had 2)." |
+| Lipid Profile ×1 | Not there | Added as a new line. It joins the lab tests group (THB, Lotus Pathology). | "Lipid Profile added." |
+| Signature Facial, 90 min | Same facial, **no duration chosen** | The guest's 90 min choice is applied to the existing line. No second facial is added. The wellness group now has a price (THB 2,040) and can be checked out. | "Signature Facial: we used the 90 min you chose earlier." |
+| Product `6b572fa4-…` | Not there, and not in the catalog | Not added. | "1 item you added before logging in is no longer offered." |
+
+### The rules behind them
+
+- **Quantities are never added together; the larger one wins.** A customer who had 2 of a test in their account and later put 3 in a guest cart almost certainly wants 3, not 5. Adding them would book (and charge for) tests nobody asked for, and in healthcare an extra lab test is not a harmless extra. The cost: a customer who really wanted 5 has to tap "+" twice, and the message tells them what was kept. A useful side effect is that the merge is **safe to repeat**: if the response is lost and the client sends the guest cart again, nothing changes the second time.
+- **A wellness duration chosen as a guest fills in a missing one.** If the account's line has no duration yet, the guest's choice is used, because that's the most recent decision the customer made.
+- **Two different durations stay as two lines.** A 60 min and a 90 min facial are different bookings, so neither overwrites the other. A guest item with no duration folds into the account's existing line for that service.
+- **Products that aren't in the catalog are skipped and reported.** The data gives no title for them, so the message can only say how many items were skipped.
+
+### Edge cases the data doesn't contain, handled anyway
+
+| Situation | What happens |
+| --- | --- |
+| Merged quantity over the booking limit (10) | Capped at 10, and the customer is told. |
+| The guest's chosen duration is no longer offered | The service is added without a duration, and the customer is asked to choose one. |
+| Unreadable item (no product id, quantity 0, negative or not a whole number) | Skipped and reported; the other items still merge. |
+| The same product twice in the guest cart | Merged with the same "larger wins" rule. |
+## Trying the failure cases
+
+Every page has a **Mock API** button in the bottom-left corner. It opens a panel (not a modal; Escape closes it) that talks to the mock server's runtime rules (`PUT /api/__mock/config`, see `server/README.md`):
+
+- **Scenarios**, one click each: the next package checkout is declined (402); the next lab test order is made but its response is lost (500 after the work); the connection drops after an order is made; the next quantity change is refused (409) or fails (500); the next login's merge fails; loading the cart fails; everything is slow (+3 s); card payments fail after the order is placed.
+- **Custom rule:** any call, any error status or a dropped connection, before or after the work is done, for one group or all, once or every time, with extra delay.
+- **Active rules** in plain words, each removable; "next time only" rules drop off once used.
+- **Reset demo** restores the original cart, forgets every order and the checkout, and makes you a first-time guest with saved items again, so the whole story can be replayed.
+
+The panel ships in every build, collapsed, because reviewers need it on a deployed copy too; in a real product it would be behind a development flag. The Task 1 query flags (`?mockDelay=3000`, `?mockFail=cart`) still work. For offline, use the browser's network tools.
+## Known data issues (Task 2)
+
+| Situation | What happens |
+| --- | --- |
+| A cart line whose `product` is `{}` (the provider removed the service) | The server puts it in an `unknown` group with no price. It can't be checked out or have its quantity changed (409 `unavailable`); it can only be removed. |
+| The server cart's `subtotals`, `itemCount` and `totalItems` are precomputed | They match the lines in the data file, but the server recomputes them from the lines on every response rather than trusting stored totals. |
+| Fractional prices (INR 23,009.50, THB 5,227.50) | Totals are summed in whole cents so they never drift (e.g. 0.1 + 0.2). |
+
+## Tests (Task 2)
+
+`npm test` runs **384 tests**: 34 on the server and 350 in the client (of which Task 2 added 162). They run in Node with Vitest, mostly against the real `task2-cart.json`.
+
+- **Server:** cart totals per currency in cents; the quantity limit and removed products; checkout idempotency (same key returns the same order, even after it settled; a reused key for a different request is refused); every kind of mismatch when the cart changed; failed payments returning lines to the cart; every merge case in the data plus repeat-safety and edge cases; mock rule matching and "after the work" failures.
+- **Cart domain:** normalising every kind of bad line (missing price, bad currency, broken durations, invalid quantity, removed product, type mismatch); subtotals and the summary never adding currencies or counting unknown prices as zero; the items sent for checkout.
+- **Quantity sync:** five quick taps sending two ordered requests; rollback on refusal; independent lines; unknown outcomes; the server choosing a different quantity; removal mid-sync.
+- **Checkout state machine:** every transition; the key kept or spent in each case; the payment-method lock; late and duplicate events ignored; error classification.
+- **Checkout store:** orders placed one at a time past a failure; retry with the same key; a new key after a decline; saving before sending; polling card payments; resuming after a reload; waiting for a connection.
+- **Storage and account:** corrupt or unreadable sessions, unavailable storage, the guest cart seeded, merged, failed and retried.
+- **Components:** rendered to static HTML and checked for content and accessibility attributes (the cart in every state, steppers, duration radios, remove buttons, the partial-failure results screen).
+
+### Checked in a real browser
+
+The interactions were driven in headless Edge through the DevTools protocol, against the real server, during development. These scripts aren't in the repo.
+
+- Five quick taps on "+": the screen went 2, 3, 4, 5, 6 without jumping back, two requests were sent (2, then 6), and the server ended at 6.
+- A failed quantity change rolled back and announced the reason.
+- Choosing a duration, removing items, where focus lands afterwards, and the announcement.
+- **The partial-failure case:** the package order was created on the server but its response replaced by a 500. The other orders went through, and the retry sent the same key and got the same order back.
+- **Reload safety:** the tab was closed while the package request was out. The new tab resent the same key without a click, got the order the first request had made, then placed the remaining orders.
+- The guest flow from a fresh profile, including the merge notice's wording and the totals afterwards.
+- The dev panel: a scenario taking effect, Escape returning focus, and Reset demo.
+- Layouts at 390 px and desktop width.
+
+## What was left out (Task 2)
+
+**The accessibility and performance pass was planned but not done.** In particular:
+
+- **No keyboard-only or screen-reader walkthrough.** Focus moves and announcements were checked with scripts, not by tabbing through or listening with VoiceOver or NVDA. No automated axe checks.
+- **Contrast of the new colours isn't measured:** the amber "needs attention" and emerald "ready" text, and the destructive red on tinted backgrounds.
+- **Large carts weren't measured.** The cart is re-normalised on every quantity tap. That's cheap for this data, but a cart with hundreds of lines hasn't been profiled.
+
+**Other things left out, and what I'd do next:**
+
+- **Interaction tests in the repo.** The browser checks above were scripts run during development. Next step: Playwright tests for the five-taps, partial-failure and reload cases.
+- **The server doesn't check prices at checkout.** It refuses an order if quantities or durations changed, but not if a price changed between review and payment. The request should carry the totals the customer saw, and the server should refuse if they differ.
+- **Concurrent requests with the same key.** The mock processes requests one at a time, so two requests with the same key can't race. A real server must lock on the key.
+- **Two tabs aren't synchronised.** Each tab runs the checkout it loaded. Idempotency keys still prevent duplicate orders, but one tab won't see the other's progress until it reloads. Listening to the `storage` event would fix that.
+- **Polling never gives up.** A card payment that never settles shows "Confirming your payment…" indefinitely, checked every 1.5 s. A real app would back off and eventually say "we'll email you".
+- **Pay at the clinic stays `pending` forever**, as the API's statuses allow nothing else. The client treats it as booked.
+- **No real card entry.** "Card" is a choice; a real integration would use the payment provider's hosted fields.
+- **No undo for removing an item.** It can be added again, so there's no confirmation either.
+- **One extra cart request after each burst of quantity changes**, to let the server's values replace the local ones. Correct, but chatty.
+- **After a reload, orders already queued are placed without asking again.** The customer pressed "Place 3 orders". Asking again would be a small change if MedEx prefers it.
+- **The dev panel ships in every build**, collapsed, so reviewers can use it on a deployed copy. In a real product it would be behind a development flag.
+- **Login is pretend**, and logging out doesn't clear a checkout session; it is only shown to the customer.
+- **An observation I couldn't reproduce:** during one manual browser run, the server ended with an untouched line's quantity at 2. Four reruns with every request logged sent exactly the expected writes and left it at 1. I believe it came from the test session rather than the app, but I couldn't prove it.
+
+## Where AI tools were used (Task 2)
+
+Built with Claude Code (Anthropic) as a pair programmer in VS Code, in the same way as Task 1:
+
+- **Analysis and plan:** Claude read the brief and the data, listed edge cases and open questions, and proposed a 14-step plan. The developer made the product decisions, including:
+  - a server-backed dev panel rather than query flags alone;
+  - merge rules: the larger quantity wins, a guest's duration fills a missing one, unknown products are skipped and reported;
+  - "Pay for everything" placing orders one after another and carrying on past a failure;
+  - stopping before the accessibility and performance pass.
+- **Code and tests:** Claude wrote them one step at a time. The developer reviewed each step and made every commit.
+- **Browser checks:** Claude wrote and ran the headless Edge scripts described above, and reported what it saw, including the one result it couldn't explain.
+- **This README:** drafted by Claude.

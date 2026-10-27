@@ -22,6 +22,9 @@ function formatterFor(currency: string, fractionDigits: number): Intl.NumberForm
     formatter = new Intl.NumberFormat('en', {
       style: 'currency',
       currency,
+      // Always the code ("INR 1,200", not "₹1,200"): with three currencies side
+      // by side, a mix of symbols and codes is harder to compare
+      currencyDisplay: 'code',
       minimumFractionDigits: fractionDigits,
       maximumFractionDigits: fractionDigits,
     })

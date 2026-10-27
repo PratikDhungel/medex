@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { shouldRetry } from '@/lib/queryClient'
-import { ApiError, apiUrl, getJsonArray } from './client'
+import { ApiError, apiUrl, getJsonArray, requestJson } from './client'
 
 const respond = (body: unknown, init: ResponseInit = {}) =>
   vi.fn().mockResolvedValue(new Response(typeof body === 'string' ? body : JSON.stringify(body), init))
@@ -70,6 +70,45 @@ describe('getJsonArray', () => {
     controller.abort()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('Aborted', 'AbortError')))
     await expect(getJsonArray('/service', controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  })
+})
+
+describe('requestJson', () => {
+  it('sends a JSON body with the method', async () => {
+    const fetch = respond({ ok: true })
+    vi.stubGlobal('fetch', fetch)
+    await requestJson('/cart/items/a', { method: 'PATCH', body: { quantity: 3 } })
+    const [url, init] = fetch.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/cart/items/a')
+    expect(init).toMatchObject({ method: 'PATCH', body: '{"quantity":3}' })
+    expect(init.headers).toMatchObject({ 'Content-Type': 'application/json' })
+  })
+
+  it('returns undefined for 204 No Content', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+    await expect(requestJson('/cart/items/a', { method: 'DELETE' })).resolves.toBeUndefined()
+  })
+
+  it('reads the error code, message and details the server sends', async () => {
+    vi.stubGlobal('fetch', respond({ code: 'quantity_limit', message: 'Up to 10', details: { maxQuantity: 10 } }, { status: 409 }))
+    expect(await rejection(requestJson('/cart/items/a', { method: 'PATCH', body: {} }))).toMatchObject({
+      kind: 'http',
+      status: 409,
+      code: 'quantity_limit',
+      serverMessage: 'Up to 10',
+      details: { maxQuantity: 10 },
+      retryable: false,
+    })
+  })
+
+  it('copes with an error response that is not JSON', async () => {
+    vi.stubGlobal('fetch', respond('Bad Gateway', { status: 502 }))
+    expect(await rejection(requestJson('/cart'))).toMatchObject({ status: 502, code: null, serverMessage: null })
+  })
+
+  it('does not retry a declined payment', async () => {
+    vi.stubGlobal('fetch', respond({ code: 'payment_declined' }, { status: 402 }))
+    expect((await rejection(requestJson('/checkout', { method: 'POST', body: {} }))).retryable).toBe(false)
   })
 })
 

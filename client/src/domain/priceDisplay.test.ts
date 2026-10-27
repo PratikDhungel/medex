@@ -27,8 +27,8 @@ describe('describePrice', () => {
 
   it('strikes through the original price when discounted', () => {
     expect(describePrice({ kind: 'fixed', price: price(5580, 6200) }, 'INR')).toMatchObject({
-      final: '₹5,580',
-      original: '₹6,200',
+      final: 'INR\u00a05,580',
+      original: 'INR\u00a06,200',
     })
   })
 
