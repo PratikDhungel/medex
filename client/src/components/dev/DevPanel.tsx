@@ -384,7 +384,8 @@ export function DevPanel() {
         className="shadow-md"
       >
         <FlaskConical aria-hidden />
-        Mock API
+        {/* Just the icon on phones, where the button would cover the page */}
+        <span className="sr-only sm:not-sr-only">Mock API</span>
       </Button>
     </div>
   )

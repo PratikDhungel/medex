@@ -9,6 +9,8 @@ import { BookingView } from '@/components/booking/BookingView'
 import { countryName } from '@/components/booking/copy'
 import { PendingBooking } from '@/components/booking/PendingBooking'
 import { ReviewPanel } from '@/components/booking/ReviewPanel'
+import { StickyReviewBar } from '@/components/booking/StickyReviewBar'
+import { formatDate, formatTime, zoneCity } from '@/domain/booking/clock'
 import type { BookingProvider } from '@/domain/booking/model'
 import { selectedSpecialist } from '@/domain/booking/selection'
 import type { BookingRequest } from '@/domain/booking/submission'
@@ -145,6 +147,13 @@ function ProviderBookingPage({ providerId }: { providerId: number }) {
           />
         )}
       </BookingView>
+      {zoned && request && (state.kind === 'idle' || state.kind === 'failed') && (
+        <StickyReviewBar
+          headingId="review-title"
+          summary={`${formatTime(request.start)} ${zoneCity(zoned.zone)} time · ${formatDate(request.date)}`}
+          action="Review"
+        />
+      )}
     </div>
   )
 }

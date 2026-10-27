@@ -1,5 +1,5 @@
 import { CalendarSearch, CloudOff, TriangleAlert, WifiOff } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import type { CalendarDate } from '@shared/time/calendarDate'
 import { zonedDateTimeAt, type TimeZone } from '@shared/time/zone'
 import { failureMessage } from '@/api/failureMessage'
@@ -12,6 +12,7 @@ import { formatDate, zoneCity } from '@/domain/booking/clock'
 import type { Availability, DayAvailability, Specialist } from '@/domain/booking/model'
 import type { BookingSelection } from '@/domain/booking/selection'
 import type { LoadStatus } from '@/hooks/loadStatus'
+import { revealOnNarrowScreens } from '@/lib/scroll'
 import { BookingCalendar, BookingCalendarSkeleton, CalendarLegend } from './BookingCalendar'
 import { peopleText } from './copy'
 import { dayReason } from './dayCopy'
@@ -134,6 +135,12 @@ function Schedule({
       providerTimeNow: zonedDateTimeAt(zone, now).time,
     })
   const firstAvailable = nextAvailableDate(availability.days, null, providerToday)
+  const dayPanel = useRef<HTMLDivElement>(null)
+  // On one column the day's times are below the calendar, out of sight
+  const chooseDate = (date: CalendarDate) => {
+    onChoose({ date })
+    revealOnNarrowScreens(() => dayPanel.current)
+  }
 
   return (
     <div className="space-y-4">
@@ -152,23 +159,26 @@ function Schedule({
             days={availability.days}
             providerToday={providerToday}
             selected={selection.date}
-            onSelect={(date) => onChoose({ date })}
+            onSelect={chooseDate}
             reasonFor={reasonFor}
             city={zoneCity(zone)}
           />
           <CalendarLegend />
         </div>
-        <DayPanel
-          day={selection.date ? dayStatusOn(selection.date, byDate, providerToday, window) : null}
-          reason={reasonFor}
-          firstAvailable={firstAvailable}
-          nearby={(date) => ({
-            before: previousAvailableDate(availability.days, date, providerToday),
-            after: nextAvailableDate(availability.days, date, providerToday),
-          })}
-          onChooseDate={(date) => onChoose({ date })}
-          renderTimes={renderTimes}
-        />
+        {/* The minimum height lets the panel scroll to the top on one column while its times are still loading */}
+        <div ref={dayPanel} className="min-h-[60svh] scroll-mt-4 self-start lg:min-h-0">
+          <DayPanel
+            day={selection.date ? dayStatusOn(selection.date, byDate, providerToday, window) : null}
+            reason={reasonFor}
+            firstAvailable={firstAvailable}
+            nearby={(date) => ({
+              before: previousAvailableDate(availability.days, date, providerToday),
+              after: nextAvailableDate(availability.days, date, providerToday),
+            })}
+            onChooseDate={chooseDate}
+            renderTimes={renderTimes}
+          />
+        </div>
       </div>
     </div>
   )

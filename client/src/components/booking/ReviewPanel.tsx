@@ -32,7 +32,7 @@ export function ReviewPanel({ booking, state, online, slow, customerZone, now, o
   const submitting = state.kind === 'submitting'
   return (
     <section aria-labelledby="review-title" className="space-y-4 rounded-xl border-2 border-primary/40 px-4 py-4">
-      <h3 id="review-title" className="flex items-center gap-2 font-accent font-semibold">
+      <h3 id="review-title" tabIndex={-1} className="flex items-center gap-2 font-accent font-semibold outline-none">
         <CalendarCheck aria-hidden className="size-4 text-primary" />
         Check your booking
       </h3>

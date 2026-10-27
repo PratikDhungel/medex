@@ -10,11 +10,13 @@ import { BookingSchedule } from '@/components/booking/BookingSchedule'
 import { BookingSummary, type SummaryBooking } from '@/components/booking/BookingSummary'
 import { MoveReview } from '@/components/booking/MoveReview'
 import { PendingBooking } from '@/components/booking/PendingBooking'
+import { StickyReviewBar } from '@/components/booking/StickyReviewBar'
 import { ZoneLegend } from '@/components/booking/ZoneLegend'
 import { RetryButton } from '@/components/common/RetryButton'
 import { StatePanel } from '@/components/explorer/StatePanel'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatDate, formatTime, zoneCity } from '@/domain/booking/clock'
 import type { Booking, BookingProvider, Specialist } from '@/domain/booking/model'
 import type { Attempt, BookingRequest } from '@/domain/booking/submission'
 import { useBookingSelection } from '@/hooks/useBookingSelection'
@@ -211,6 +213,13 @@ function RescheduleForm({ booking, provider, specialist, customerZone, now }: Re
           }
         />
       </div>
+      {request && (state.kind === 'idle' || state.kind === 'failed') && (
+        <StickyReviewBar
+          headingId="move-title"
+          summary={`${formatTime(request.start)} ${zoneCity(provider.zone)} time · ${formatDate(request.date)}`}
+          action="Review change"
+        />
+      )}
     </div>
   )
 }

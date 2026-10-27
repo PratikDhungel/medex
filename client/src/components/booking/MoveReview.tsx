@@ -51,7 +51,7 @@ export function MoveReview({ from, to, state, online, slow, customerZone, now, o
   return (
     <section aria-labelledby="move-title" className="space-y-4 rounded-xl border-2 border-primary/40 px-4 py-4">
       <div className="space-y-1">
-        <h3 id="move-title" className="flex items-center gap-2 font-accent font-semibold">
+        <h3 id="move-title" tabIndex={-1} className="flex items-center gap-2 font-accent font-semibold outline-none">
           <CalendarClock aria-hidden className="size-4 text-primary" />
           Check the change
         </h3>
