@@ -66,11 +66,23 @@ export interface AvailabilityParams {
   numberOfPeople: number
   /** While rescheduling, that booking's own slots count as free */
   rescheduling?: string
+  /**
+   * Today at the provider, by the browser's clock. Only part of the cache
+   * key: when midnight passes there, the calendar is fetched again.
+   */
+  asOf?: CalendarDate
 }
 
-export const availabilityQuery = ({ providerId, specialistId, numberOfPeople, rescheduling }: AvailabilityParams) =>
+export const availabilityQuery = ({ providerId, specialistId, numberOfPeople, rescheduling, asOf }: AvailabilityParams) =>
   queryOptions({
-    queryKey: [...bookingKeys.occupancy(providerId), 'availability', specialistId, numberOfPeople, rescheduling ?? null] as const,
+    queryKey: [
+      ...bookingKeys.occupancy(providerId),
+      'availability',
+      specialistId,
+      numberOfPeople,
+      rescheduling ?? null,
+      asOf ?? null,
+    ] as const,
     queryFn: async ({ signal }): Promise<Availability> => {
       const path = withQuery(`${BASE}/providers/${providerId}/availability`, { specialistId, numberOfPeople, rescheduling })
       return required(normaliseAvailability(await requestJson(path, { signal })), path, 'calendar')

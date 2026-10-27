@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { bookingProviderQuery } from '@/api/booking'
+import { BookingSchedule } from '@/components/booking/BookingSchedule'
 import { BookingView } from '@/components/booking/BookingView'
 import { countryName } from '@/components/booking/copy'
 import { selectedSpecialist } from '@/domain/booking/selection'
@@ -47,7 +48,20 @@ function ProviderBookingPage({ providerId }: { providerId: number }) {
         specialist={specialist}
         staleSpecialist={stale}
         onChoose={choose}
-      />
+      >
+        {provider?.zone && specialist && (
+          <BookingSchedule
+            // A new specialist starts from their own first available date
+            key={specialist.id}
+            provider={{ ...provider, zone: provider.zone }}
+            specialist={specialist}
+            customerZone={customerZone}
+            now={now}
+            selection={selection}
+            onChoose={choose}
+          />
+        )}
+      </BookingView>
     </div>
   )
 }
