@@ -1,4 +1,4 @@
-import { ShoppingCart } from 'lucide-react'
+import { CalendarDays, ShoppingCart } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { LogInButton } from '@/components/account/LogInButton'
@@ -47,6 +47,18 @@ export function AppLayout() {
                 Log out
               </Button>
             )}
+            <NavLink
+              to="/book"
+              className={({ isActive }) =>
+                cn(
+                  'inline-flex h-9 items-center gap-2 rounded-full px-4 font-accent text-sm font-medium outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  isActive && 'bg-accent',
+                )
+              }
+            >
+              <CalendarDays aria-hidden className="size-4" />
+              <span className="sr-only sm:not-sr-only">Appointments</span>
+            </NavLink>
             <NavLink
               to="/cart"
               className={({ isActive }) =>
