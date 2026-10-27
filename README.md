@@ -1,15 +1,16 @@
 # medex: MedEx take-home exercises
 
-Two exercises from the MedEx senior frontend take-home, built in one app:
+Three exercises from the MedEx senior frontend take-home, built in one app:
 
 - **[Task 1: Service Explorer](#task-1-service-explorer)** (`/`): browse and filter 3,200 services from 67 providers, with live filter counts, prices that never mix currencies, and the whole view in the URL.
 - **[Task 2: Multi-provider cart and split checkout](#task-2-multi-provider-cart-and-split-checkout)** (`/cart`, `/checkout`): a cart grouped by service type and paid in several currencies, optimistic quantity changes, split checkout where each group is its own order, partial failures, double-charge prevention, reload safety and a guest cart merged on login.
+- **[Task 3: Appointment booking across time zones](#task-3-appointment-booking-across-time-zones)**: a 90-day calendar and slot picker that shows the provider's time and the customer's own side by side, with specialists, group bookings, a slot taken by someone else, and rescheduling.
 
 ```
 medex/
 ├── client/   # React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, React Router, Vitest
 └── server/   # Express 5 + TypeScript mock API, Vitest
-              # data: server/data/task1-service-explorer.json, server/data/task2-cart.json
+              # data: server/data/task1-service-explorer.json, task2-cart.json, task3-booking.json
 ```
 
 ## Getting started
@@ -540,3 +541,47 @@ Built with Claude Code (Anthropic) as a pair programmer in VS Code, in the same 
 - **Code and tests:** Claude wrote them one step at a time. The developer reviewed each step and made every commit.
 - **Browser checks:** Claude wrote and ran the headless Edge scripts described above, and reported what it saw, including the one result it couldn't explain.
 - **This README:** drafted by Claude.
+
+---
+
+# Task 3: Appointment booking across time zones
+
+> "I live in Kathmandu. I'm booking a check-up at a hospital in Bangkok for when I travel there next month. Which time is the appointment, mine or theirs?"
+
+Work in progress.
+
+## Known data issues (Task 3)
+
+What `server/data/task3-booking.json` contains: 6 providers, 8 specialists, 2 closures, 613 booked slots and one existing booking. The client and server never edit the source data.
+
+### Time zones, one format per provider
+
+| Provider | Raw `timezone` | Read as | How |
+| --- | --- | --- | --- |
+| Riverside International Hospital (TH) | `"Asia/Bangkok"` | Asia/Bangkok (UTC+7) | A valid IANA name |
+| Himal Neo Clinic (NP) | `" UTC+05:45"` | Asia/Kathmandu | Trimmed and parsed as an offset. The offset matches Nepal's zone, so the provider gets Nepal's name rather than a bare offset. |
+| Annapurna Diagnostics (NP) | `"Nepal Standard Time"` | Asia/Kathmandu | A Windows zone name, looked up in a small Windows→IANA table |
+| Pashupati Medical Centre (NP) | `"(GMT+5:45)"` | Asia/Kathmandu | Brackets stripped, single-digit hour accepted, then as above |
+| Lumbini Polyclinic (NP) | `"Asia/Katmandu "` | Asia/Kathmandu | Trimmed. `Katmandu` is the old spelling of the IANA name, mapped to the current one |
+| Aravali Hospital (IN) | `""` | Asia/Kolkata (UTC+5:30) | Empty, so it falls back to the provider's country |
+
+### Needs fixing at the source
+
+| Issue | Example | What the app does | Suggested next step |
+| --- | --- | --- | --- |
+| Booked slots on a closure day | Riverside has 4 bookings on its public holiday (day 12), Himal Neo has 10 on its staff training day (day 4) | The closure wins: the day is closed and shows the closure's reason. | Find and contact those customers. Adding a closure should flag existing bookings on that day. |
+| Booked slots outside the provider's opening hours | Dr. P. Chaiyaporn has bookings at 07:00, but Riverside opens at 08:00. Dr. N. Rana has bookings at 20:00–20:40, but Riverside closes at 20:00. | These slots are never offered, so the bookings change nothing the customer sees. | Same as above: these bookings can't take place as recorded. |
+| The existing booking isn't in `bookedSlots` | `BK-20261008-0042`, Dr. A. Wongsakul, day 3 at 11:20 | The mock API counts it as taken at startup, so nobody else can book that slot. During a reschedule it's shown as "your current booking" and counts as free for the booking being moved. | Keep the bookings list and the slot list in one source. |
+| The booking id carries a date | `BK-20261008-…` | Ignored. The real date comes from `dayOffset`. | None. Ids shouldn't be read for meaning. |
+
+### Handled by design
+
+| Situation | What the app does |
+| --- | --- |
+| Specialists' hours that go past the provider's opening hours. Dr. P. Chaiyaporn works 07:00–12:00, Riverside opens at 08:00 (09:00 on Saturday). Dr. N. Rana works 18:00–21:00, Riverside closes at 20:00 Monday–Thursday and 17:00 on Friday. | Only slots inside the opening hours are offered. The slot list explains the missing hours, e.g. "Dr. N. Rana's hours run to 21:00, but the hospital closes at 20:00 on Mondays." On Fridays and Saturdays Dr. Rana has no slots at all, and the calendar says so. |
+| Late-evening slots. Dr. V. Mehra (Aravali, India) has slots up to 23:00–23:25. | At 23:00 in India it's already the next day in Bangkok, and 23:15 in Kathmandu. The customer's time shows its own date whenever the date differs from the provider's. |
+| A last slot that ends exactly at closing. Dr. M. Thapa's 22:00–22:30 slot at Lumbini, which closes at 22:30. | Offered. A slot only has to end by closing time, and the buffer after the last slot doesn't count. |
+| A fully booked day. Dr. A. Wongsakul on day 5. | The calendar marks it "Fully booked" and the slot list offers the next available date. |
+| Booked slots only cover days 0–29 | Days 30–89 are open wherever the provider and specialist work. |
+
+The data doesn't contain malformed times, durations of zero or less, unknown specialists, duplicate bookings or off-grid booked times. The parsing code guards against them anyway and has tests for them, because the providers type this data in by hand.
