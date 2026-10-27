@@ -9,7 +9,8 @@ Three exercises from the MedEx senior frontend take-home, built in one app:
 ```
 medex/
 ├── client/   # React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, React Router, Vitest
-└── server/   # Express 5 + TypeScript mock API, Vitest
+├── server/   # Express 5 + TypeScript mock API, Vitest
+└── shared/   # Pure TypeScript used by both: time zones and booking slots (Task 3), Vitest
               # data: server/data/task1-service-explorer.json, task2-cart.json, task3-booking.json
 ```
 
@@ -18,7 +19,7 @@ medex/
 Requires Node.js 20 or newer. From the repo root:
 
 ```bash
-npm install    # installs root tooling, then server/ and client/ dependencies
+npm install    # installs root tooling, then shared/, server/ and client/ dependencies
 npm run dev    # starts the API (http://localhost:3001) and the app (http://localhost:5173)
 ```
 
@@ -29,7 +30,7 @@ Open http://localhost:5173 for the explorer, or http://localhost:5173/cart for t
 | `npm run dev`   | Run server and client together (concurrently) |
 | `npm run build` | Build server, then client                     |
 | `npm run lint`  | Lint the client                               |
-| `npm test`      | Run server, then client unit tests (Vitest)   |
+| `npm test`      | Run shared, server, then client unit tests (Vitest) |
 
 The root `package.json` only holds scripts; it is not an npm workspace. See [client/README.md](client/README.md) and [server/README.md](server/README.md) for each app on its own.
 

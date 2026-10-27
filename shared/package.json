@@ -1,0 +1,15 @@
+{
+  "name": "medex-shared",
+  "private": true,
+  "type": "module",
+  "description": "Pure TypeScript used by both the server and the client: time zones and booking slots. No runtime dependencies.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  }
+}
