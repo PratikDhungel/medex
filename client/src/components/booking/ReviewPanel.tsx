@@ -65,16 +65,25 @@ export function ReviewPanel({ booking, state, online, slow, customerZone, now, o
   )
 }
 
-interface ConflictPanelProps {
+export interface ConflictPanelProps {
   booking: SummaryBooking
   state: Extract<SubmissionState, { kind: 'conflict' }>
   customerZone: TimeZone
   now: number
   onPick: (choice: SlotChoice) => void
+  /** What stayed as it was; defaults to the wording for a new booking */
+  keptText?: string
 }
 
 /** Someone else got there first: say so, keep everything else, and offer the nearest times */
-function ConflictPanel({ booking, state, customerZone, now, onPick }: ConflictPanelProps) {
+export function ConflictPanel({
+  booking,
+  state,
+  customerZone,
+  now,
+  onPick,
+  keptText = 'Nothing was booked. Your specialist, group size and date are kept',
+}: ConflictPanelProps) {
   const { zone } = booking
   const taken = formatTime(state.request.start)
   const showCustomer = !sameClock(zone, customerZone, now)
@@ -92,7 +101,7 @@ function ConflictPanel({ booking, state, customerZone, now, onPick }: ConflictPa
           : `${taken} can't be booked any more`}
       </h3>
       <p className="text-sm">
-        Nothing was booked. Your specialist, group size and date are kept
+        {keptText}
         {state.alternatives.length > 0 ? '. These are the closest times still free:' : '. Please choose another time.'}
       </p>
       {state.alternatives.length > 0 && (

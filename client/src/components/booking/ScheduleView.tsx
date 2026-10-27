@@ -29,6 +29,8 @@ export interface ScheduleViewProps {
   specialist: Specialist & { consultation: NonNullable<Specialist['consultation']> }
   /** Other bookable specialists at the provider, offered when this one has no times */
   otherSpecialists: Specialist[]
+  /** The group size can't be changed (rescheduling), so don't suggest fewer people */
+  groupFixed?: boolean
   selection: BookingSelection
   onChoose: (change: Partial<BookingSelection>) => void
   /** The times for an available selected date; `nextAvailable` is for when they've all gone since */
@@ -115,6 +117,7 @@ function Schedule({
   now,
   specialist,
   otherSpecialists,
+  groupFixed = false,
   selection,
   onChoose,
   renderTimes,
@@ -139,6 +142,7 @@ function Schedule({
           specialist={specialist}
           otherSpecialists={otherSpecialists}
           people={selection.people}
+          groupFixed={groupFixed}
           onChoose={onChoose}
         />
       )}
@@ -174,11 +178,12 @@ interface NoAvailabilityProps {
   specialist: Specialist
   otherSpecialists: Specialist[]
   people: number
+  groupFixed: boolean
   onChoose: (change: Partial<BookingSelection>) => void
 }
 
 /** No bookable day in the whole window: say so plainly and offer the ways forward */
-function NoAvailability({ specialist, otherSpecialists, people, onChoose }: NoAvailabilityProps) {
+function NoAvailability({ specialist, otherSpecialists, people, groupFixed, onChoose }: NoAvailabilityProps) {
   return (
     <StatePanel
       icon={CalendarSearch}
@@ -190,7 +195,7 @@ function NoAvailability({ specialist, otherSpecialists, people, onChoose }: NoAv
       role="status"
       action={
         <>
-          {people > 1 && (
+          {people > 1 && !groupFixed && (
             <Button variant="outline" onClick={() => onChoose({ people: 1 })}>
               Look for 1 person instead
             </Button>

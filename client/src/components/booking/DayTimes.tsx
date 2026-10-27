@@ -33,8 +33,8 @@ export interface DayTimesProps {
   /** The next bookable date after this one, for when this day has nothing left */
   nextAvailable: CalendarDate | null
   onChooseDate: (date: CalendarDate) => void
-  /** While rescheduling: the booking, and the start times it holds on this date */
-  rescheduling?: { bookingId: string; ownStarts: ReadonlySet<WallTime> }
+  /** While rescheduling: the booking, the start times it holds on this date, and its start if it's on this date */
+  rescheduling?: { bookingId: string; ownStarts: ReadonlySet<WallTime>; currentStart?: WallTime }
   /** Say so when the chosen time has gone (default); off when another panel already does */
   chosenNotice?: boolean
 }
@@ -58,6 +58,7 @@ export function DayTimes(props: DayTimesProps) {
         people: props.people,
         nowMs: props.now,
         ownStarts: rescheduling?.ownStarts,
+        currentStart: rescheduling?.currentStart,
       })
     : []
 
@@ -157,6 +158,8 @@ function Times({
             ? `Someone has just booked ${formatTime(chosen.start)}. Please choose another time.`
             : chosen.state === 'started'
               ? `${formatTime(chosen.start)} has started. Please choose a later time.`
+              : chosen.state === 'current'
+                ? `${formatTime(chosen.start)} is when your booking is now. Please choose a different time.`
               : `${formatTime(chosen.start)} no longer has room for ${people} people in a row. Please choose another time.`}
         </p>
       )}

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CloudOff, Hospital, WifiOff } from 'lucide-react'
 import { bookingProvidersQuery } from '@/api/booking'
 import { failureMessage } from '@/api/failureMessage'
+import { ManageBooking } from '@/components/booking/ManageBooking'
 import { ProviderList, ProviderListSkeleton } from '@/components/booking/ProviderList'
 import { RetryButton } from '@/components/common/RetryButton'
 import { StatePanel } from '@/components/explorer/StatePanel'
@@ -60,6 +61,7 @@ export function BookProvidersPage() {
             Please check back soon.
           </StatePanel>
         ))}
+      <ManageBooking />
     </div>
   )
 }

@@ -18,6 +18,8 @@ export type SlotState =
   | 'started'
   /** Free, but the slots after it can't take the whole group */
   | 'no-room'
+  /** Where the booking being rescheduled is now: choosing it would change nothing */
+  | 'current'
 
 export interface SlotView {
   start: WallTime
@@ -36,10 +38,12 @@ export interface SlotContext {
   nowMs: number
   /** Start times held by the booking being rescheduled: free for it */
   ownStarts?: ReadonlySet<WallTime>
+  /** That booking's start, when it's on this date */
+  currentStart?: WallTime
 }
 
 export function slotViews(slots: readonly Slot[], context: SlotContext): SlotView[] {
-  const { date, zone, customerZone, consultation, people, nowMs, ownStarts } = context
+  const { date, zone, customerZone, consultation, people, nowMs, ownStarts, currentStart } = context
   const booked = (slot: Slot) => slot.booked && !ownStarts?.has(slot.start)
   const started = (slot: Slot) => hasStarted(zone, date, slot.start, nowMs)
   const startable = new Set(groupStartTimes(slots, people, slotStep(consultation), (slot) => !booked(slot) && !started(slot)))
@@ -47,7 +51,16 @@ export function slotViews(slots: readonly Slot[], context: SlotContext): SlotVie
   return slots.map((slot) => ({
     start: slot.start,
     end: slot.end,
-    state: booked(slot) ? 'booked' : started(slot) ? 'started' : startable.has(slot.start) ? 'available' : 'no-room',
+    state:
+      slot.start === currentStart
+        ? 'current'
+        : booked(slot)
+          ? 'booked'
+          : started(slot)
+            ? 'started'
+            : startable.has(slot.start)
+              ? 'available'
+              : 'no-room',
     customer: customerTimeOf(zone, date, slot.start, customerZone),
   }))
 }

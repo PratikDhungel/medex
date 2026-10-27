@@ -127,15 +127,16 @@ export function submissionReducer(state: SubmissionState, event: SubmissionEvent
 export const outstandingAttempt = (state: SubmissionState): Attempt | null =>
   state.kind === 'submitting' || state.kind === 'unknown' ? state.attempt : null
 
-const STORAGE_KEY = 'medex.booking.pending'
+/** Where an outstanding new booking is kept; a reschedule uses its own key */
+export const PENDING_BOOKING_KEY = 'medex.booking.pending'
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** An outstanding attempt saved before a reload. One we can't fully read is dropped. */
-export function loadAttempt(storage: SessionStorageLike): Attempt | null {
+export function loadAttempt(storage: SessionStorageLike, key = PENDING_BOOKING_KEY): Attempt | null {
   try {
-    const raw: unknown = JSON.parse(storage.getItem(STORAGE_KEY) ?? 'null')
+    const raw: unknown = JSON.parse(storage.getItem(key) ?? 'null')
     if (!isObject(raw) || typeof raw.idempotencyKey !== 'string' || !isObject(raw.request)) return null
     const { providerId, specialistId, date, start, numberOfPeople } = raw.request
     const valid =
@@ -152,10 +153,10 @@ export function loadAttempt(storage: SessionStorageLike): Attempt | null {
   }
 }
 
-export function saveAttempt(storage: SessionStorageLike, attempt: Attempt | null) {
+export function saveAttempt(storage: SessionStorageLike, attempt: Attempt | null, key = PENDING_BOOKING_KEY) {
   try {
-    if (attempt) storage.setItem(STORAGE_KEY, JSON.stringify(attempt))
-    else storage.removeItem(STORAGE_KEY)
+    if (attempt) storage.setItem(key, JSON.stringify(attempt))
+    else storage.removeItem(key)
   } catch {
     // Storage full or blocked: the attempt then lasts only for this page load
   }

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { CircleCheck, CloudOff, SearchX, WifiOff } from 'lucide-react'
 import { Link, useLocation, useParams } from 'react-router'
+import { todayIn } from '@shared/time/zone'
 import { bookingProviderQuery, bookingQuery } from '@/api/booking'
 import { ApiError } from '@/api/client'
 import { failureMessage } from '@/api/failureMessage'
@@ -9,6 +10,7 @@ import { RetryButton } from '@/components/common/RetryButton'
 import { StatePanel } from '@/components/explorer/StatePanel'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatDate, formatTime, zoneCity } from '@/domain/booking/clock'
 import { useCustomerZone } from '@/hooks/useCustomerZone'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { loadStatusOf, type LoadStatus } from '@/hooks/loadStatus'
@@ -18,7 +20,9 @@ import { PageHeading } from './PageHeading'
 /** A booking, read back from the server: after booking, or from a link */
 export function BookingConfirmationPage() {
   const bookingId = useParams().bookingId ?? ''
-  const justBooked = (useLocation().state as { justBooked?: boolean } | null)?.justBooked === true
+  const navigation = useLocation().state as { justBooked?: boolean; movedFrom?: { date: string; start: number } } | null
+  const justBooked = navigation?.justBooked === true
+  const movedFrom = navigation?.movedFrom
   const customerZone = useCustomerZone()
   const now = useNow()
 
@@ -28,7 +32,7 @@ export function BookingConfirmationPage() {
   const status: LoadStatus = bookingStatus.kind === 'ready' ? loadStatusOf(provider) : bookingStatus
   const retry = () => void (booking.isError ? booking.refetch() : provider.refetch())
 
-  const title = justBooked ? "You're booked" : 'Your booking'
+  const title = justBooked ? "You're booked" : movedFrom ? 'Your booking has moved' : 'Your booking'
   useDocumentTitle(title)
 
   const specialist = provider.data?.specialists.find((s) => s.id === booking.data?.specialistId)
@@ -71,6 +75,18 @@ export function BookingConfirmationPage() {
               Booking confirmed
             </p>
           )}
+          {movedFrom && zone && (
+            <p role="status" className="space-y-1">
+              <span className="flex items-center gap-2 font-medium text-emerald-700">
+                <CircleCheck aria-hidden className="size-5" />
+                Change confirmed
+              </span>
+              <span className="block text-sm text-muted-foreground">
+                It was <s>{formatDate(movedFrom.date, 'long')}, {formatTime(movedFrom.start)} {zoneCity(zone)} time</s>. That time is no
+                longer yours.
+              </span>
+            </p>
+          )}
           {zone && specialist?.consultation ? (
             <BookingSummary
               reference={booking.data.bookingId}
@@ -93,6 +109,11 @@ export function BookingConfirmationPage() {
             </p>
           )}
           <div className="flex flex-wrap gap-2">
+            {zone && booking.data.date >= todayIn(zone, now) && (
+              <Button asChild>
+                <Link to={`/bookings/${encodeURIComponent(booking.data.bookingId)}/reschedule`}>Change date or time</Link>
+              </Button>
+            )}
             <Button asChild variant="outline">
               <Link to="/book">Book another appointment</Link>
             </Button>

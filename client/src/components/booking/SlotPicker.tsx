@@ -32,6 +32,7 @@ const STATE_WORDS: Record<Exclude<SlotState, 'available'>, (people: number) => s
   booked: () => 'Booked',
   started: () => 'Started',
   'no-room': (people) => `No room for ${people}`,
+  current: () => 'Your booking now',
 }
 
 /**

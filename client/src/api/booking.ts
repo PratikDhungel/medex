@@ -141,8 +141,8 @@ export async function createBooking({ start, ...request }: NewBooking, signal?: 
  * Moves a booking. Safe to resend: moving a booking to where it already is
  * succeeds. Errors as for createBooking.
  */
-export async function rescheduleBooking(bookingId: string, date: CalendarDate, start: WallTime): Promise<Booking> {
+export async function rescheduleBooking(bookingId: string, date: CalendarDate, start: WallTime, signal?: AbortSignal): Promise<Booking> {
   const path = `${BASE}/bookings/${encodeURIComponent(bookingId)}`
-  const body = await requestJson(path, { method: 'PUT', body: { date, startTime: formatWallTime(start) } })
+  const body = await requestJson(path, { method: 'PUT', body: { date, startTime: formatWallTime(start) }, signal })
   return required(normaliseBooking(body), path, 'booking')
 }

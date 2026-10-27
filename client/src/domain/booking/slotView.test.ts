@@ -65,6 +65,11 @@ describe('slotViews', () => {
     expect(states(views).slice(0, 2)).toEqual(['started', 'available'])
   })
 
+  it('marks where the booking being rescheduled is now', () => {
+    const views = slotViews(wongsakulSlots(['11:20']), context({ ownStarts: new Set([t('11:20')]), currentStart: t('11:20') }))
+    expect(states(views).slice(1, 4)).toEqual(['available', 'current', 'available'])
+  })
+
   it("counts the booking being rescheduled as free for itself", () => {
     const views = slotViews(wongsakulSlots(['11:20']), context({ ownStarts: new Set([t('11:20')]) }))
     expect(views[2].state).toBe('available')
