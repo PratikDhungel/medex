@@ -25,7 +25,7 @@ for (const issue of bookingData.issues) console.warn(`task3-booking.json: ${issu
 const cart = new CartStore(cartData.serverLines)
 const rules = new MockRules()
 const orders = new OrderService(cart, () => rules.settlement)
-const bookings = new BookingService(bookingData)
+const bookings = new BookingService(bookingData, Date.now, () => rules.fullyBookedSpecialists)
 
 app.use(express.json())
 

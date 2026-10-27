@@ -51,6 +51,11 @@ export interface MockRule {
 export interface MockConfig {
   rules: MockRule[]
   settlement: Settlement
+  /**
+   * Specialists treated as fully booked on every day, for the "no availability
+   * in the 90-day window" state, which the data file never produces
+   */
+  fullyBookedSpecialists: string[]
 }
 
 const DEFAULT_SETTLEMENT: Settlement = { outcome: 'paid', afterMs: 4000 }
@@ -101,7 +106,12 @@ export function parseMockConfig(body: unknown): MockConfig | string {
     return '"settlement" must be { outcome: "paid" | "failed", afterMs: number }'
   }
 
-  return { rules, settlement: settlement as unknown as Settlement }
+  const fullyBooked = body.fullyBookedSpecialists ?? []
+  if (!Array.isArray(fullyBooked) || !fullyBooked.every((id) => typeof id === 'string')) {
+    return '"fullyBookedSpecialists" must be an array of specialist ids'
+  }
+
+  return { rules, settlement: settlement as unknown as Settlement, fullyBookedSpecialists: fullyBooked }
 }
 
 const FAILURE_BODIES: Record<number, { code: string; message: string }> = {
@@ -131,7 +141,7 @@ export function send(req: Request, res: Response, status: number, body?: unknown
 }
 
 export class MockRules {
-  private config: MockConfig = { rules: [], settlement: DEFAULT_SETTLEMENT }
+  private config: MockConfig = { rules: [], settlement: DEFAULT_SETTLEMENT, fullyBookedSpecialists: [] }
 
   get current(): MockConfig {
     return structuredClone(this.config)
@@ -143,6 +153,10 @@ export class MockRules {
 
   get settlement(): Settlement {
     return { ...this.config.settlement }
+  }
+
+  get fullyBookedSpecialists(): ReadonlySet<string> {
+    return new Set(this.config.fullyBookedSpecialists)
   }
 
   /** The first rule that applies to this request, using up one of its `times` */

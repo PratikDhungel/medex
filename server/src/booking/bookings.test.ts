@@ -161,6 +161,15 @@ describe('reschedule', () => {
   })
 })
 
+describe('fully booked specialists (dev panel)', () => {
+  it('has no free day in the window for that specialist only', () => {
+    const blocked = new BookingService(data, () => NOW, () => new Set([WONGSAKUL]))
+    expect(blocked.availability(RIVERSIDE, WONGSAKUL, 1).days.some((day) => day.status.kind === 'available')).toBe(false)
+    expect(blocked.availability(RIVERSIDE, '0d113411-a562-4427-bcf5-96aff364e228', 1).days.some((day) => day.status.kind === 'available')).toBe(true)
+    expect(() => blocked.create(request())).toThrow(expect.objectContaining({ code: 'slot_unavailable' }))
+  })
+})
+
 describe('reset', () => {
   it('restores the seed bookings', () => {
     bookings.reschedule(EXISTING, '2026-11-11', t('12:00'))

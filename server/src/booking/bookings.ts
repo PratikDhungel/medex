@@ -7,7 +7,7 @@ import {
   type SlotRef,
   type SpecialistDay,
 } from '../../../shared/booking/availability.js'
-import { daySlots, hasStarted, slotStep, type DaySlot } from '../../../shared/booking/slots.js'
+import { consultationSlots, daySlots, hasStarted, slotStep, type DaySlot } from '../../../shared/booking/slots.js'
 import { addDays, daysBetween, weekdayOf, type CalendarDate } from '../../../shared/time/calendarDate.js'
 import { formatWallTime, type WallTime } from '../../../shared/time/wallTime.js'
 import { todayIn } from '../../../shared/time/zone.js'
@@ -61,6 +61,8 @@ export class BookingService {
   constructor(
     private readonly data: BookingData,
     private readonly now: () => number = Date.now,
+    /** Dev panel: specialists to treat as fully booked on every day */
+    private readonly fullyBooked: () => ReadonlySet<string> = () => new Set(),
   ) {
     this.reset()
   }
@@ -181,6 +183,7 @@ export class BookingService {
     const step = slotStep(specialist.consultation)
     const sameDay = (slot: TakenSlot) => slot.providerId === providerId && slot.specialistId === specialistId && slot.date === date
     const bookedStarts = [
+      ...(this.fullyBooked().has(specialistId) ? consultationSlots(specialist.consultation).map((slot) => slot.start) : []),
       ...this.data.bookedSlots.filter(sameDay).map((slot) => slot.start),
       ...this.raced.filter(sameDay).map((slot) => slot.start),
       // A group booking holds one slot per person, one after another

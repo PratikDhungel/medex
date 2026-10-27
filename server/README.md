@@ -92,6 +92,8 @@ A rule names an `endpoint` (`getCart`, `updateLine`, `removeLine`, `mergeCart`, 
 
 `settlement` sets how card payments end: `{ "outcome": "paid" | "failed", "afterMs": 4000 }`.
 
+`fullyBookedSpecialists` lists specialist ids to treat as fully booked on every day of the booking window (Task 3). The data file never leaves a specialist with no availability in 90 days, so this is how that state is shown.
+
 ```bash
 # Decline the package group's next checkout, leave the others alone
 curl -X PUT localhost:3001/api/__mock/config -H 'content-type: application/json' \

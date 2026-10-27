@@ -14,9 +14,13 @@ async function run(rules: MockRules, endpoint: 'checkout', body: object) {
 }
 
 describe('parseMockConfig', () => {
-  it('accepts a valid config and fills in the default settlement', () => {
+  it('accepts a valid config and fills in the defaults', () => {
     const config = parseMockConfig({ rules: [{ endpoint: 'checkout', status: 402, times: 1 }] })
-    expect(config).toMatchObject({ rules: [{ endpoint: 'checkout', status: 402, times: 1 }], settlement: { outcome: 'paid' } })
+    expect(config).toMatchObject({
+      rules: [{ endpoint: 'checkout', status: 402, times: 1 }],
+      settlement: { outcome: 'paid' },
+      fullyBookedSpecialists: [],
+    })
   })
 
   it.each([
@@ -25,6 +29,7 @@ describe('parseMockConfig', () => {
     [{ rules: [{ endpoint: 'checkout', status: 200 }] }],
     [{ rules: [{ endpoint: 'checkout', times: 0 }] }],
     [{ rules: [], settlement: { outcome: 'maybe', afterMs: 0 } }],
+    [{ rules: [], fullyBookedSpecialists: 'everyone' }],
   ])('rejects %j', (body) => {
     expect(typeof parseMockConfig(body)).toBe('string')
   })
