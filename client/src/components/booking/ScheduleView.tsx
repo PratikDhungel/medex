@@ -31,8 +31,8 @@ export interface ScheduleViewProps {
   otherSpecialists: Specialist[]
   selection: BookingSelection
   onChoose: (change: Partial<BookingSelection>) => void
-  /** The times for an available selected date */
-  renderTimes?: (date: CalendarDate) => ReactNode
+  /** The times for an available selected date; `nextAvailable` is for when they've all gone since */
+  renderTimes?: (date: CalendarDate, nextAvailable: CalendarDate | null) => ReactNode
 }
 
 /** "Choose a date": the calendar, and the panel for the chosen day */
@@ -218,7 +218,7 @@ interface DayPanelProps {
   firstAvailable: CalendarDate | null
   nearby: (date: CalendarDate) => { before: CalendarDate | null; after: CalendarDate | null }
   onChooseDate: (date: CalendarDate) => void
-  renderTimes?: (date: CalendarDate) => ReactNode
+  renderTimes?: (date: CalendarDate, nextAvailable: CalendarDate | null) => ReactNode
 }
 
 /** The chosen day: its times, or why it can't be booked and the nearest days that can */
@@ -240,7 +240,7 @@ function DayPanel({ day, reason, firstAvailable, nearby, onChooseDate, renderTim
     return (
       <div className="space-y-3 self-start">
         <h3 className="font-accent font-semibold">{formatDate(day.date, 'long')}</h3>
-        {renderTimes?.(day.date)}
+        {renderTimes?.(day.date, nearby(day.date).after)}
       </div>
     )
   }
