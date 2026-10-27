@@ -1,4 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express'
+import { BookingService } from './booking/bookings.js'
+import { loadBookingData } from './booking/data.js'
+import { createBookingRouter } from './booking/routes.js'
 import { CartStore } from './cart/cartStore.js'
 import { ApiError } from './cart/errors.js'
 import { OrderService } from './cart/orders.js'
@@ -14,11 +17,15 @@ const PORT = Number(process.env.PORT) || 3001
 // Load once at startup; a malformed file should stop the server, not each request
 const data = loadServiceExplorerData()
 const cartData = loadCartData()
+// dayOffset values become real dates here, on each provider's calendar
+const bookingData = loadBookingData()
+for (const issue of bookingData.issues) console.warn(`task3-booking.json: ${issue}`)
 
 // Cart and orders live in memory, so a restart starts from the data file again
 const cart = new CartStore(cartData.serverLines)
 const rules = new MockRules()
 const orders = new OrderService(cart, () => rules.settlement)
+const bookings = new BookingService(bookingData)
 
 app.use(express.json())
 
@@ -41,6 +48,15 @@ app.get('/api/service', mockNetwork('services'), (_req: Request, res: Response) 
 
 const catalog = new Map(cartData.catalog.map((product) => [product.id, product]))
 app.use('/api', createCartRouter({ cart, orders, rules, catalog, guestCart: cartData.guestCart }))
+app.use('/api/booking', createBookingRouter(bookings, rules))
+
+/** Dev panel: restores the seed cart and bookings, and forgets all orders. Rules are kept. */
+app.post('/api/__mock/reset', (_req: Request, res: Response) => {
+  cart.reset()
+  orders.reset()
+  bookings.reset()
+  res.status(204).end()
+})
 
 // Unknown API routes
 app.use('/api', (_req: Request, res: Response) => {
@@ -66,6 +82,6 @@ app.listen(PORT, () => {
   console.log(
     `Server listening on http://localhost:${PORT} ` +
       `(${data.services.length} services, ${data.providers.length} providers, ${data.categories.length} categories, ` +
-      `${cartData.serverLines.length} cart lines)`,
+      `${cartData.serverLines.length} cart lines, ${bookingData.providers.size} booking providers)`,
   )
 })

@@ -2,14 +2,31 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express'
 import type { Settlement } from './cart/orders.js'
 
 /**
- * Failure injection for the cart API, set at runtime by the client's dev panel
+ * Failure injection for the cart and booking APIs, set at runtime by the client's dev panel
  * (GET/PUT /api/__mock/config). Unlike the query flags in mock.ts, a rule can
  * target one call among several identical ones, e.g. only the package group's
  * POST /checkout, and only the next time.
  */
 
-export const ENDPOINTS = ['getCart', 'updateLine', 'removeLine', 'mergeCart', 'checkout', 'getOrder'] as const
+export const ENDPOINTS = [
+  'getCart',
+  'updateLine',
+  'removeLine',
+  'mergeCart',
+  'checkout',
+  'getOrder',
+  'bookingProviders',
+  'bookingProvider',
+  'availability',
+  'slots',
+  'createBooking',
+  'getBooking',
+  'updateBooking',
+] as const
 export type Endpoint = (typeof ENDPOINTS)[number]
+
+/** Endpoints where someone else can take the slot first (`when: 'raced'`) */
+const RACEABLE: readonly Endpoint[] = ['createBooking', 'updateBooking']
 
 export interface MockRule {
   endpoint: Endpoint
@@ -20,9 +37,11 @@ export interface MockRule {
   /**
    * `before`: fail without doing the work. `after`: do the work, then fail
    * anyway, like a response lost on the way back. That's the case
-   * idempotency keys exist for.
+   * idempotency keys exist for. `raced`: someone else books the same slot
+   * just before this request, which then meets a real conflict (booking
+   * endpoints only; `status` is ignored).
    */
-  when?: 'before' | 'after'
+  when?: 'before' | 'after' | 'raced'
   /** Only requests whose route params or body fields equal these, e.g. `{ "groupType": "package" }` */
   match?: Record<string, string>
   /** How many matching requests to affect; leave out for every one */
@@ -58,7 +77,12 @@ export function parseMockConfig(body: unknown): MockConfig | string {
     if (status !== undefined && !(status === 0 || (Number.isInteger(status) && (status as number) >= 400 && (status as number) < 600))) {
       return `rules[${index}].status must be 0 or an error status (400-599)`
     }
-    if (when !== undefined && when !== 'before' && when !== 'after') return `rules[${index}].when must be before or after`
+    if (when !== undefined && when !== 'before' && when !== 'after' && when !== 'raced') {
+      return `rules[${index}].when must be before, after or raced`
+    }
+    if (when === 'raced' && !RACEABLE.includes(endpoint as Endpoint)) {
+      return `rules[${index}].when can only be raced for ${RACEABLE.join(', ')}`
+    }
     if (match !== undefined && !(isObject(match) && Object.values(match).every((v) => typeof v === 'string'))) {
       return `rules[${index}].match must map field names to strings`
     }
@@ -95,6 +119,17 @@ export function sendInjectedFailure(req: Request, res: Response, status: number)
   res.status(status).json(FAILURE_BODIES[status] ?? { code: 'simulated_error', message: `Simulated ${status} response` })
 }
 
+/**
+ * Sends a success response, unless a mock rule asked for this request to fail
+ * after its work was done (see MockRules).
+ */
+export function send(req: Request, res: Response, status: number, body?: unknown) {
+  const failAfter = res.locals.failAfter as number | undefined
+  if (failAfter !== undefined) return sendInjectedFailure(req, res, failAfter)
+  if (body === undefined) res.status(status).end()
+  else res.status(status).json(body)
+}
+
 export class MockRules {
   private config: MockConfig = { rules: [], settlement: DEFAULT_SETTLEMENT }
 
@@ -124,7 +159,8 @@ export class MockRules {
 
   /**
    * Applies the matching rule to a request. An `after` failure is left in
-   * `res.locals.failAfter` for the route to send once it has done its work.
+   * `res.locals.failAfter` for the route to send once it has done its work,
+   * and a `raced` rule sets `res.locals.raced` for the route to act on.
    */
   middleware(endpoint: Endpoint): RequestHandler {
     return async (req: Request, res: Response, next: NextFunction) => {
@@ -132,6 +168,10 @@ export class MockRules {
       if (!rule) return next()
 
       if (rule.delayMs) await sleep(Math.min(rule.delayMs, MAX_DELAY_MS))
+      if (rule.when === 'raced') {
+        res.locals.raced = true
+        return next()
+      }
       if (rule.status === undefined) return next()
 
       if (rule.when === 'after') {

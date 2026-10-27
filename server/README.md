@@ -7,10 +7,10 @@ Minimal Node.js + Express API written in TypeScript. Data is read from JSON file
 ```bash
 npm install
 npm run dev        # run src/ with tsx, restarting on file changes
-npm run build      # compile src/ to dist/ with tsc
-npm start          # run the compiled build (run `npm run build` first)
+npm run build      # compile src/ (and the ../shared code it uses) to dist/ with tsc
+npm start          # run the compiled build, dist/server/src/index.js (run `npm run build` first)
 npm run typecheck  # type-check without emitting
-npm test           # cart, checkout and mock-rule tests (Vitest)
+npm test           # cart, checkout, booking and mock-rule tests (Vitest)
 ```
 
 Runs on `http://localhost:3001` by default; override with the `PORT` environment variable.
@@ -79,13 +79,13 @@ The query flags above also work here, with the resource names `cart`, `checkout`
 | ------ | ------------------------ | ---------------------------------------------------- |
 | GET    | `/api/__mock/config`     | Current rules and payment settlement                 |
 | PUT    | `/api/__mock/config`     | Replace them                                         |
-| POST   | `/api/__mock/reset`      | Restore the seed cart and forget all orders          |
+| POST   | `/api/__mock/reset`      | Restore the seed cart and bookings, forget all orders |
 | GET    | `/api/__mock/guest-cart` | The guest cart from the data file                    |
 
-A rule names an `endpoint` (`getCart`, `updateLine`, `removeLine`, `mergeCart`, `checkout`, `getOrder`) and any of:
+A rule names an `endpoint` (`getCart`, `updateLine`, `removeLine`, `mergeCart`, `checkout`, `getOrder`, or a booking endpoint listed below) and any of:
 
 - `status`: respond with this error status; `0` drops the connection.
-- `when`: `before` (default) fails without doing the work; `after` does the work and then fails, like a response lost on the way back.
+- `when`: `before` (default) fails without doing the work; `after` does the work and then fails, like a response lost on the way back; `raced` (booking writes only) has someone else take the slot just before the request, which then gets a real `slot_taken` conflict.
 - `delayMs`: extra latency.
 - `match`: only requests whose body fields or route params equal these values.
 - `times`: affect only this many matching requests.
@@ -101,3 +101,39 @@ curl -X PUT localhost:3001/api/__mock/config -H 'content-type: application/json'
 curl -X PUT localhost:3001/api/__mock/config -H 'content-type: application/json' \
   -d '{"rules":[{"endpoint":"checkout","status":500,"when":"after","times":1}]}'
 ```
+
+## Booking endpoints (Task 3)
+
+Under `/api/booking`, because `/api/providers` already serves Task 1. Seeded from `data/task3-booking.json`; bookings are held in memory and reset with `POST /api/__mock/reset`.
+
+When the server starts, every `dayOffset` becomes a date on that provider's own calendar (day 0 is today *there*). Providers are returned exactly as stored, messy `timezone` values included; the server reads them with the same code the client uses (`../shared`). All dates are `YYYY-MM-DD` and all times `HH:MM` on the provider's clock.
+
+| Method | Path | Mock rule endpoint | Responses |
+| --- | --- | --- | --- |
+| GET | `/providers` | `bookingProviders` | 200 raw providers |
+| GET | `/providers/:id` | `bookingProvider` | 200 raw provider with specialists, 404 |
+| GET | `/providers/:id/availability?specialistId=&numberOfPeople=&rescheduling=` | `availability` | 200 `{ today, days: [{ date, status, … }] }` for the 90-day window |
+| GET | `/providers/:id/slots?date=&specialistId=&rescheduling=` | `slots` | 200 `{ date, slots: [{ startTime, endTime, isBooked }] }`, 400 `date_out_of_range` |
+| POST | `/bookings` `{ providerId, specialistId, date, startTime, numberOfPeople, idempotencyKey? }` | `createBooking` | 201 `{ bookingId }`, 409 |
+| GET | `/bookings/:id` | `getBooking` | 200 booking, 404 |
+| PUT | `/bookings/:id` `{ date, startTime }` | `updateBooking` | 200 booking, 409 |
+
+The availability endpoint isn't in the brief. Without it the calendar would need 90 slot requests to show which days can be booked and why. A day's `status` is one of `available` (with `availableStartTimes`), `past`, `outside-window`, `closure` (with the provider's `reason`), `closed`, `specialist-unavailable` (with `opensAt`/`closesAt` when the opening hours cut the specialist's hours), `fully-booked`, `no-time-left` or `not-enough-in-a-row`.
+
+`rescheduling=<bookingId>` counts that booking's own slots as free, so a booking can move to a time that overlaps where it is now.
+
+**Conflicts.** A 409 is `slot_taken` (someone else holds one of the slots) or `slot_unavailable` (the time can't be booked: started, closed, off the slot grid, or not enough slots in a row for the group). Both carry `details.alternatives`: up to 3 bookable start times nearest to the one asked for, up to 3 days either side.
+
+**Group bookings** hold one slot per person, one after another with the same specialist. **Idempotency:** a POST with an `idempotencyKey` it has seen before returns the same booking; the same key for a different booking is a 409 `idempotency_key_reused`. A PUT is safe to repeat as it is.
+
+```bash
+# Someone else takes the slot first on the next booking
+curl -X PUT localhost:3001/api/__mock/config -H 'content-type: application/json' \
+  -d '{"rules":[{"endpoint":"createBooking","when":"raced","times":1}]}'
+
+# The booking is made but the response is lost
+curl -X PUT localhost:3001/api/__mock/config -H 'content-type: application/json' \
+  -d '{"rules":[{"endpoint":"createBooking","status":0,"when":"after","times":1}]}'
+```
+
+The query flags work here too, with the resource name `booking` (`?mockDelay=3000`, `?mockFail=booking`).

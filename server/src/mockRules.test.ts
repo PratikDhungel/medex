@@ -47,3 +47,22 @@ describe('MockRules', () => {
     expect(await run(rules, 'checkout', {})).toEqual({ passed: true, status: undefined, failAfter: 500 })
   })
 })
+
+describe('raced rules', () => {
+  it('are only allowed where a slot can be taken', () => {
+    expect(parseMockConfig({ rules: [{ endpoint: 'createBooking', when: 'raced', times: 1 }] })).toMatchObject({
+      rules: [{ endpoint: 'createBooking', when: 'raced' }],
+    })
+    expect(typeof parseMockConfig({ rules: [{ endpoint: 'checkout', when: 'raced' }] })).toBe('string')
+  })
+
+  it('let the request through with res.locals.raced set, for the route to act on', async () => {
+    const rules = new MockRules()
+    rules.set({ rules: [{ endpoint: 'createBooking', when: 'raced', times: 1 }], settlement } as MockConfig)
+    const res = { locals: {} as Record<string, unknown> }
+    const next = vi.fn()
+    await rules.middleware('createBooking')({ body: {}, params: {} } as unknown as Request, res as unknown as Response, next)
+    expect(next).toHaveBeenCalledOnce()
+    expect(res.locals.raced).toBe(true)
+  })
+})
