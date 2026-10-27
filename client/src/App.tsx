@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { BookingConfirmationPage } from '@/pages/BookingConfirmationPage'
 import { BookingPage } from '@/pages/BookingPage'
 import { BookProvidersPage } from '@/pages/BookProvidersPage'
 import { CartPage } from '@/pages/CartPage'
@@ -16,6 +17,7 @@ function App() {
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="book" element={<BookProvidersPage />} />
         <Route path="book/:providerId" element={<BookingPage />} />
+        <Route path="bookings/:bookingId" element={<BookingConfirmationPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

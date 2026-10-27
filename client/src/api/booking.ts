@@ -129,9 +129,9 @@ export interface NewBooking {
  *   409 `slot_taken` / `slot_unavailable`, with `details.alternatives`
  *   500 / network: the booking may or may not exist; resend with the same key to find out
  */
-export async function createBooking({ start, ...request }: NewBooking): Promise<{ bookingId: string }> {
+export async function createBooking({ start, ...request }: NewBooking, signal?: AbortSignal): Promise<{ bookingId: string }> {
   const path = `${BASE}/bookings`
-  const body = await requestJson(path, { method: 'POST', body: { ...request, startTime: formatWallTime(start) } })
+  const body = await requestJson(path, { method: 'POST', body: { ...request, startTime: formatWallTime(start) }, signal })
   const bookingId = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).bookingId : undefined
   if (typeof bookingId !== 'string' || bookingId === '') throw new ApiError('invalid', path, 'The server sent no booking id')
   return { bookingId }

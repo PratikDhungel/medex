@@ -35,6 +35,8 @@ export interface DayTimesProps {
   onChooseDate: (date: CalendarDate) => void
   /** While rescheduling: the booking, and the start times it holds on this date */
   rescheduling?: { bookingId: string; ownStarts: ReadonlySet<WallTime> }
+  /** Say so when the chosen time has gone (default); off when another panel already does */
+  chosenNotice?: boolean
 }
 
 /** Loads the chosen day's times and keeps them fresh */
@@ -119,7 +121,20 @@ export function DayTimesView(props: DayTimesViewProps) {
   }
 }
 
-function Times({ provider, specialist, date, people, selected, onSelect, customerZone, now, views, nextAvailable, onChooseDate }: DayTimesViewProps) {
+function Times({
+  provider,
+  specialist,
+  date,
+  people,
+  selected,
+  onSelect,
+  customerZone,
+  now,
+  views,
+  nextAvailable,
+  onChooseDate,
+  chosenNotice = true,
+}: DayTimesViewProps) {
   const available = views.filter((view) => view.state === 'available')
   const chosen = selected === null ? undefined : views.find((view) => view.start === selected)
   const note = hoursNote(hoursLimitOn(date, provider.schedule, specialist.consultation), date, {
@@ -136,7 +151,7 @@ function Times({ provider, specialist, date, people, selected, onSelect, custome
         {available.length > 0 ? `${availableText(views, people)}.` : ''}
       </p>
 
-      {chosen && chosen.state !== 'available' && (
+      {chosenNotice && chosen && chosen.state !== 'available' && (
         <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
           {chosen.state === 'booked'
             ? `Someone has just booked ${formatTime(chosen.start)}. Please choose another time.`

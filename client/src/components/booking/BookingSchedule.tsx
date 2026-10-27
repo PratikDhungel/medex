@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import type { WallTime } from '@shared/time/wallTime'
 import { todayIn, type TimeZone } from '@shared/time/zone'
 import { availabilityQuery } from '@/api/booking'
@@ -20,10 +21,14 @@ interface BookingScheduleProps {
   onChoose: (change: Partial<BookingSelection>) => void
   /** While rescheduling: the booking, and the start times it holds on each date */
   rescheduling?: { bookingId: string; ownStartsOn: (date: string) => ReadonlySet<WallTime> }
+  /** Shown under the times once one is chosen: the review and confirm step */
+  review?: ReactNode
+  /** Whether the times say so when the chosen one has gone; off when something else already does */
+  chosenNotice?: boolean
 }
 
 /** Loads the specialist's 90 days for the group size and shows the calendar */
-export function BookingSchedule({ provider, specialist, customerZone, now, selection, onChoose, rescheduling }: BookingScheduleProps) {
+export function BookingSchedule({ provider, specialist, customerZone, now, selection, onChoose, rescheduling, review, chosenNotice }: BookingScheduleProps) {
   const query = useQuery(
     availabilityQuery({
       providerId: provider.id,
@@ -55,19 +60,23 @@ export function BookingSchedule({ provider, specialist, customerZone, now, selec
       selection={selection}
       onChoose={onChoose}
       renderTimes={(date, nextAvailable) => (
-        <DayTimes
-          provider={provider}
-          specialist={{ ...specialist, consultation }}
-          date={date}
-          people={selection.people}
-          selected={selection.date === date ? selection.time : null}
-          onSelect={(time) => onChoose({ date, time })}
-          customerZone={customerZone}
-          now={now}
-          nextAvailable={nextAvailable}
-          onChooseDate={(next) => onChoose({ date: next })}
-          rescheduling={rescheduling && { bookingId: rescheduling.bookingId, ownStarts: rescheduling.ownStartsOn(date) }}
-        />
+        <>
+          <DayTimes
+            provider={provider}
+            specialist={{ ...specialist, consultation }}
+            date={date}
+            people={selection.people}
+            selected={selection.date === date ? selection.time : null}
+            onSelect={(time) => onChoose({ date, time })}
+            customerZone={customerZone}
+            now={now}
+            nextAvailable={nextAvailable}
+            onChooseDate={(next) => onChoose({ date: next })}
+            rescheduling={rescheduling && { bookingId: rescheduling.bookingId, ownStarts: rescheduling.ownStartsOn(date) }}
+            chosenNotice={chosenNotice}
+          />
+          {selection.date === date && selection.time !== null && review}
+        </>
       )}
     />
   )

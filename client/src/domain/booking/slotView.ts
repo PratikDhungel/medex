@@ -52,6 +52,10 @@ export function slotViews(slots: readonly Slot[], context: SlotContext): SlotVie
   }))
 }
 
+/** When the last person's appointment ends: one slot per person, with the buffers between them */
+export const bookingEnd = (consultation: Consultation, start: WallTime, people: number): WallTime =>
+  start + (people - 1) * slotStep(consultation) + consultation.durationMinutes
+
 export type PartOfDay = 'morning' | 'afternoon' | 'evening'
 
 const NOON = 12 * 60

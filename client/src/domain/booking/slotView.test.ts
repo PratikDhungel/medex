@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TimeZone } from '@shared/time/zone'
 import type { Slot } from './model'
-import { groupByPartOfDay, hoursLimitOn, partOfDay, slotViews, type SlotContext } from './slotView'
+import { bookingEnd, groupByPartOfDay, hoursLimitOn, partOfDay, slotViews, type SlotContext } from './slotView'
 
 const t = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3))
 const BANGKOK: TimeZone = { kind: 'iana', id: 'Asia/Bangkok' }
@@ -114,5 +114,13 @@ describe('hoursLimitOn', () => {
   it('is null when every advertised slot fits, or the provider is closed', () => {
     expect(hoursLimitOn('2026-11-02', RIVERSIDE, WONGSAKUL)).toBeNull()
     expect(hoursLimitOn('2026-11-01', RIVERSIDE, WONGSAKUL)).toBeNull()
+  })
+})
+
+describe('bookingEnd', () => {
+  it("ends with the last person's appointment, after the buffers between them", () => {
+    // 3 people from 10:00: 10:00–10:30, 10:40–11:10, 11:20–11:50
+    expect(bookingEnd(WONGSAKUL, t('10:00'), 3)).toBe(t('11:50'))
+    expect(bookingEnd(WONGSAKUL, t('10:00'), 1)).toBe(t('10:30'))
   })
 })

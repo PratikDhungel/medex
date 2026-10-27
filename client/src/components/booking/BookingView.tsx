@@ -33,6 +33,10 @@ export interface BookingViewProps {
   onChoose: (change: Partial<BookingSelection>) => void
   /** The calendar and times for the chosen specialist */
   children?: ReactNode
+  /** Shown above everything else, e.g. a booking whose result isn't known yet */
+  notice?: ReactNode
+  /** Choices can't be changed, e.g. while a booking's result is unknown */
+  locked?: boolean
 }
 
 const otherProviders = (
@@ -105,6 +109,8 @@ function ProviderBooking({
   staleSpecialist,
   onChoose,
   children,
+  notice,
+  locked = false,
 }: BookingViewProps & { provider: BookingProvider }) {
   if (!provider.zone) {
     // Showing times in a guessed zone could put the customer at the clinic at the wrong hour
@@ -127,47 +133,50 @@ function ProviderBooking({
 
   return (
     <div className="space-y-8">
+      {notice}
       <ZoneLegend provider={provider.zone} customer={customerZone} now={now} />
+      {/* inert: no focus, clicks or screen reader access while locked */}
+      <div inert={locked} className={locked ? 'space-y-8 opacity-50' : 'space-y-8'}>
+        {staleSpecialist && (
+          <p role="status" className="rounded-xl border bg-muted/50 px-4 py-3 text-sm">
+            The specialist in your link isn't taking online bookings any more. Please choose another.
+          </p>
+        )}
 
-      {staleSpecialist && (
-        <p role="status" className="rounded-xl border bg-muted/50 px-4 py-3 text-sm">
-          The specialist in your link isn't taking online bookings any more. Please choose another.
-        </p>
-      )}
+        {provider.specialists.length > 1 ? (
+          <SpecialistPicker
+            specialists={provider.specialists}
+            zone={provider.zone}
+            selectedId={specialist?.id ?? null}
+            onSelect={(specialistId) => onChoose({ specialistId })}
+          />
+        ) : (
+          specialist?.consultation && (
+            <section aria-labelledby="specialist-title" className="space-y-1">
+              <h2 id="specialist-title" className="font-accent text-lg font-semibold">
+                Your specialist
+              </h2>
+              <p>
+                <span className="font-medium">{specialist.name}</span>
+                {specialist.speciality && `, ${specialist.speciality}`}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {consultationText(specialist.consultation)} ({zoneTimeLabel(provider.zone)})
+              </p>
+            </section>
+          )
+        )}
 
-      {provider.specialists.length > 1 ? (
-        <SpecialistPicker
-          specialists={provider.specialists}
-          zone={provider.zone}
-          selectedId={specialist?.id ?? null}
-          onSelect={(specialistId) => onChoose({ specialistId })}
-        />
-      ) : (
-        specialist?.consultation && (
-          <section aria-labelledby="specialist-title" className="space-y-1">
-            <h2 id="specialist-title" className="font-accent text-lg font-semibold">
-              Your specialist
-            </h2>
-            <p>
-              <span className="font-medium">{specialist.name}</span>
-              {specialist.speciality && `, ${specialist.speciality}`}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {consultationText(specialist.consultation)} ({zoneTimeLabel(provider.zone)})
-            </p>
-          </section>
-        )
-      )}
+        <PeoplePicker people={selection.people} onChange={(people) => onChoose({ people })} />
 
-      <PeoplePicker people={selection.people} onChange={(people) => onChoose({ people })} />
-
-      {specialist ? (
-        children
-      ) : (
-        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          Choose a specialist to see the dates and times they can see you.
-        </p>
-      )}
+        {specialist ? (
+          children
+        ) : (
+          <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+            Choose a specialist to see the dates and times they can see you.
+          </p>
+        )}
+      </div>
     </div>
   )
 }
