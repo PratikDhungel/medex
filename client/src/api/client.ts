@@ -52,15 +52,17 @@ export class ApiError extends Error {
   }
 }
 
+/** `path` may carry its own query string; the mock flags are added after it */
 export function apiUrl(path: string, pageSearch = globalThis.location?.search ?? ''): string {
+  const [pathname, ownQuery = ''] = path.split('?', 2)
   const pageParams = new URLSearchParams(pageSearch)
-  const params = new URLSearchParams()
+  const params = new URLSearchParams(ownQuery)
   for (const key of MOCK_PARAMS) {
     const value = pageParams.get(key)
     if (value !== null) params.set(key, value)
   }
   const query = params.toString()
-  return `/api${path}${query ? `?${query}` : ''}`
+  return `/api${pathname}${query ? `?${query}` : ''}`
 }
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
