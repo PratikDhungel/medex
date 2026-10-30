@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { flattenCart } from './cart/cart.js'
 import type { CartLine, GuestCartItem, Product } from './cart/types.js'
+import { dataFile } from './paths.js'
 
 export interface CartData {
   catalog: Product[]
@@ -9,8 +10,7 @@ export interface CartData {
   guestCart: GuestCartItem[]
 }
 
-// Resolves from src/ (tsx) and dist/ (compiled) alike
-const DATA_FILE = new URL('../data/task2-cart.json', import.meta.url)
+const DATA_FILE = dataFile('task2-cart.json')
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

@@ -1,13 +1,29 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FlaskConical, Trash2, X } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { getMockConfig, MOCK_ENDPOINTS, resetMockData, setMockConfig, type MockConfig, type MockEndpoint, type MockRule } from '@/api/mock'
 import { Button } from '@/components/ui/button'
 import { serviceTypeLabel } from '@/domain/serviceTypes'
 import { useAccountStore } from '@/hooks/useAccount'
 import { useCheckoutStore } from '@/hooks/useCheckout'
-import { describeRule, ENDPOINT_LABELS, GROUP_TYPES, SCENARIOS, STATUS_LABELS, withRule } from './rules'
+import {
+  customerZoneOverride,
+  setCustomerZoneOverride,
+  subscribeCustomerZoneOverride,
+  ZONE_CHOICES,
+} from '@/lib/customerZoneOverride'
+import {
+  describeRule,
+  ENDPOINT_LABELS,
+  FULLY_BOOKED_DEMO,
+  GROUP_TYPES,
+  RACEABLE_ENDPOINTS,
+  SCENARIOS,
+  STATUS_LABELS,
+  withRule,
+  type Scenario,
+} from './rules'
 
 const configKey = ['mock-config'] as const
 
@@ -16,7 +32,7 @@ const fieldClass = 'h-8 w-full rounded-md border bg-background px-2 text-sm'
 interface RuleDraft {
   endpoint: MockEndpoint
   status: string
-  when: 'before' | 'after'
+  when: 'before' | 'after' | 'raced'
   groupType: string
   times: 'once' | 'always'
   delaySeconds: string
@@ -24,11 +40,13 @@ interface RuleDraft {
 
 const EMPTY_DRAFT: RuleDraft = { endpoint: 'checkout', status: '500', when: 'before', groupType: '', times: 'once', delaySeconds: '' }
 
+const raced = (draft: RuleDraft) => draft.when === 'raced' && RACEABLE_ENDPOINTS.includes(draft.endpoint)
+
 function ruleFrom(draft: RuleDraft): MockRule {
   const delay = Number(draft.delaySeconds)
   return {
     endpoint: draft.endpoint,
-    ...(draft.status ? { status: Number(draft.status), when: draft.when } : {}),
+    ...(raced(draft) ? { when: 'raced' as const } : draft.status ? { status: Number(draft.status), when: draft.when === 'raced' ? 'before' : draft.when } : {}),
     ...(draft.groupType && draft.endpoint === 'checkout' ? { match: { groupType: draft.groupType } } : {}),
     ...(draft.times === 'once' ? { times: 1 } : {}),
     ...(delay > 0 ? { delayMs: Math.round(delay * 1000) } : {}),
@@ -45,6 +63,8 @@ export function DevPanel() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [draft, setDraft] = useState<RuleDraft>(EMPTY_DRAFT)
+  const zoneOverride = useSyncExternalStore(subscribeCustomerZoneOverride, customerZoneOverride, () => null)
+  const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const toggle = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const panelId = useId()
@@ -133,21 +153,55 @@ export function DevPanel() {
 
           <section className="space-y-2">
             <h3 className="font-medium">Scenarios</h3>
-            <ul className="space-y-1">
-              {SCENARIOS.map((scenario) => (
-                <li key={scenario.id}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-auto w-full justify-start rounded-lg py-1.5 text-left whitespace-normal"
-                    disabled={!current || busy}
-                    onClick={() => current && void save(scenario.apply(current), `Set: ${scenario.label}`)}
-                  >
-                    {scenario.label}
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            {(
+              [
+                ['booking', 'Booking'],
+                ['cart', 'Cart and checkout'],
+              ] as [Scenario['group'], string][]
+            ).map(([group, title]) => (
+              <div key={group} className="space-y-1">
+                <h4 className="text-xs text-muted-foreground">{title}</h4>
+                <ul className="space-y-1">
+                  {SCENARIOS.filter((scenario) => scenario.group === group).map((scenario) => (
+                    <li key={scenario.id}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-auto w-full justify-start rounded-lg py-1.5 text-left whitespace-normal"
+                        disabled={!current || busy}
+                        onClick={() => current && void save(scenario.apply(current), `Set: ${scenario.label}`)}
+                      >
+                        {scenario.label}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-medium">Your time zone</h3>
+            <label className="block space-y-1">
+              <span className="text-xs text-muted-foreground">
+                Show "your time" as if this device were in another zone. Saved in this browser.
+              </span>
+              <select
+                className={fieldClass}
+                value={zoneOverride ?? ''}
+                onChange={(e) => {
+                  setCustomerZoneOverride(e.target.value || null)
+                  setMessage(e.target.value ? `Your time now shows as ${e.target.value}.` : "Your time now follows this device's zone.")
+                }}
+              >
+                <option value="">This device ({deviceZone})</option>
+                {ZONE_CHOICES.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone.replace('_', ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
           </section>
 
           <section className="space-y-2">
@@ -173,6 +227,31 @@ export function DevPanel() {
             ) : (
               <p className="text-muted-foreground">None: every call behaves normally.</p>
             )}
+            {current && current.fullyBookedSpecialists.length > 0 && (
+              <ul className="space-y-1">
+                {current.fullyBookedSpecialists.map((id) => {
+                  const label = `${id === FULLY_BOOKED_DEMO.id ? FULLY_BOOKED_DEMO.label : id}: fully booked for 90 days`
+                  return (
+                    <li key={id} className="flex items-start justify-between gap-2 rounded-md bg-muted/50 px-2 py-1">
+                      <span>{label}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`Remove: ${label}`}
+                        onClick={() =>
+                          void save(
+                            { ...current, fullyBookedSpecialists: current.fullyBookedSpecialists.filter((other) => other !== id) },
+                            'Specialist available again.',
+                          )
+                        }
+                      >
+                        <Trash2 aria-hidden />
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
             {current && (
               <p className="text-muted-foreground">
                 Card payments {current.settlement.outcome === 'paid' ? 'succeed' : 'fail'} {current.settlement.afterMs / 1000} s after
@@ -185,7 +264,8 @@ export function DevPanel() {
                 size="sm"
                 disabled={!current || busy}
                 onClick={() =>
-                  current && void save({ rules: [], settlement: { outcome: 'paid', afterMs: 4000 } }, 'All rules cleared.')
+                  current &&
+                  void save({ rules: [], settlement: { outcome: 'paid', afterMs: 4000 }, fullyBookedSpecialists: [] }, 'All rules cleared.')
                 }
               >
                 Clear all
@@ -226,11 +306,12 @@ export function DevPanel() {
                 <select
                   className={fieldClass}
                   value={draft.when}
-                  disabled={!draft.status}
+                  disabled={!draft.status && !RACEABLE_ENDPOINTS.includes(draft.endpoint)}
                   onChange={(e) => setDraft({ ...draft, when: e.target.value as RuleDraft['when'] })}
                 >
                   <option value="before">Before the work</option>
                   <option value="after">After the work</option>
+                  {RACEABLE_ENDPOINTS.includes(draft.endpoint) && <option value="raced">Someone else takes the slot first</option>}
                 </select>
               </label>
               {draft.endpoint === 'checkout' && (
@@ -270,7 +351,11 @@ export function DevPanel() {
                 />
               </label>
             </div>
-            <Button type="submit" size="sm" disabled={!current || busy || (!draft.status && !(Number(draft.delaySeconds) > 0))}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!current || busy || (!draft.status && !raced(draft) && !(Number(draft.delaySeconds) > 0))}
+            >
               Add rule
             </Button>
           </form>
@@ -278,8 +363,8 @@ export function DevPanel() {
           <section className="space-y-2 border-t pt-3">
             <h3 className="font-medium">Start over</h3>
             <p className="text-muted-foreground">
-              Restores the original cart, forgets all orders and the checkout, and makes you a first-time guest with saved
-              items again.
+              Restores the original cart and bookings, forgets all orders and the checkout, and makes you a first-time guest
+              with saved items again.
             </p>
             <Button variant="outline" size="sm" disabled={busy} onClick={() => void resetDemo()}>
               Reset demo
@@ -299,7 +384,8 @@ export function DevPanel() {
         className="shadow-md"
       >
         <FlaskConical aria-hidden />
-        Mock API
+        {/* Just the icon on phones, where the button would cover the page */}
+        <span className="sr-only sm:not-sr-only">Mock API</span>
       </Button>
     </div>
   )

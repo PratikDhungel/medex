@@ -20,6 +20,12 @@ describe('apiUrl', () => {
     expect(apiUrl('/service', '')).toBe('/api/service')
   })
 
+  it("adds the mock flags after the path's own query", () => {
+    expect(apiUrl('/booking/providers/48/slots?date=2026-11-02', '?mockDelay=2000')).toBe(
+      '/api/booking/providers/48/slots?date=2026-11-02&mockDelay=2000',
+    )
+  })
+
   it('passes on only the mock flags from the page URL', () => {
     expect(apiUrl('/service', '?type=lab_test&mockDelay=2000&mockFail=providers')).toBe(
       '/api/service?mockDelay=2000&mockFail=providers',

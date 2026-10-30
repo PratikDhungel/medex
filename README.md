@@ -1,15 +1,17 @@
 # medex: MedEx take-home exercises
 
-Two exercises from the MedEx senior frontend take-home, built in one app:
+Three exercises from the MedEx senior frontend take-home, built in one app:
 
 - **[Task 1: Service Explorer](#task-1-service-explorer)** (`/`): browse and filter 3,200 services from 67 providers, with live filter counts, prices that never mix currencies, and the whole view in the URL.
 - **[Task 2: Multi-provider cart and split checkout](#task-2-multi-provider-cart-and-split-checkout)** (`/cart`, `/checkout`): a cart grouped by service type and paid in several currencies, optimistic quantity changes, split checkout where each group is its own order, partial failures, double-charge prevention, reload safety and a guest cart merged on login.
+- **[Task 3: Appointment booking across time zones](#task-3-appointment-booking-across-time-zones)** (`/book`, `/bookings/:id`): a 90-day calendar and slot picker that shows the provider's time and the customer's own side by side, with specialists, group bookings, a slot taken by someone else, and rescheduling.
 
 ```
 medex/
 ├── client/   # React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, React Router, Vitest
-└── server/   # Express 5 + TypeScript mock API, Vitest
-              # data: server/data/task1-service-explorer.json, server/data/task2-cart.json
+├── server/   # Express 5 + TypeScript mock API, Vitest
+└── shared/   # Pure TypeScript used by both: time zones and booking slots (Task 3), Vitest
+              # data: server/data/task1-service-explorer.json, task2-cart.json, task3-booking.json
 ```
 
 ## Getting started
@@ -17,18 +19,18 @@ medex/
 Requires Node.js 20 or newer. From the repo root:
 
 ```bash
-npm install    # installs root tooling, then server/ and client/ dependencies
+npm install    # installs root tooling, then shared/, server/ and client/ dependencies
 npm run dev    # starts the API (http://localhost:3001) and the app (http://localhost:5173)
 ```
 
-Open http://localhost:5173 for the explorer, or http://localhost:5173/cart for the cart. Vite proxies `/api/*` to the Express server.
+Open http://localhost:5173 for the explorer, http://localhost:5173/cart for the cart, or http://localhost:5173/book to book an appointment. Vite proxies `/api/*` to the Express server.
 
 | Root script     | What it does                                  |
 | --------------- | --------------------------------------------- |
 | `npm run dev`   | Run server and client together (concurrently) |
 | `npm run build` | Build server, then client                     |
 | `npm run lint`  | Lint the client                               |
-| `npm test`      | Run server, then client unit tests (Vitest)   |
+| `npm test`      | Run shared, server, then client unit tests (Vitest) |
 
 The root `package.json` only holds scripts; it is not an npm workspace. See [client/README.md](client/README.md) and [server/README.md](server/README.md) for each app on its own.
 
@@ -539,4 +541,299 @@ Built with Claude Code (Anthropic) as a pair programmer in VS Code, in the same 
   - stopping before the accessibility and performance pass.
 - **Code and tests:** Claude wrote them one step at a time. The developer reviewed each step and made every commit.
 - **Browser checks:** Claude wrote and ran the headless Edge scripts described above, and reported what it saw, including the one result it couldn't explain.
+- **This README:** drafted by Claude.
+
+---
+
+# Task 3: Appointment booking across time zones
+
+> "I live in Kathmandu. I'm booking a check-up at a hospital in Bangkok for when I travel there next month. Which time is the appointment, mine or theirs?"
+
+The booking picker a customer uses to choose a specialist, a date and a time, book for up to 4 people, and move an existing booking. Every time on screen is the provider's, because that's where the customer has to be, with the customer's own time beside it. The hard parts are the data (six providers, six ways of writing a time zone), what "today" means at the provider, slots with buffers, and a booking whose result is unknown.
+
+## Trying it
+
+`npm run dev`, then open http://localhost:5173/book.
+
+1. **Choose Riverside International Hospital** (Bangkok). If your computer isn't set to Kathmandu, open **Mock API** (bottom-left) and set **Your time zone** to `Asia/Kathmandu`: that's the brief's story. Every time now shows Bangkok time first and yours under it.
+2. **Choose Dr. N. Rana.** Fridays and Saturdays say *Off*: choose one to read why. On a Monday, the times end at 7:40 PM, and a note explains the hospital closes at 8:00 PM.
+3. **Choose 3 people** and a day: only start times with 3 free slots in a row are offered; the rest say "No room for 3".
+4. **Book a time.** Before confirming, the review shows the appointment on both clocks.
+5. **Make it go wrong:** in **Mock API**, pick "Next booking: someone else takes the slot first" or "made, then the connection drops", then confirm again.
+6. **Reschedule the existing booking:** on `/book`, enter `BK-20261008-0042` under *Manage a booking*, then **Change date or time**.
+7. **Late evening:** set your time zone to `Asia/Bangkok` and open Aravali Hospital (India): Dr. V. Mehra's 11:00 PM is 12:30 AM the next day for you.
+
+Bookings live in memory on the server: restarting it (or **Reset demo** in the panel) puts the data file back.
+
+## What the brief asked for, and where it stands
+
+✅ done · ◑ done with a caveat · ✗ not done
+
+| Requirement | Status | Notes |
+| --- | --- | --- |
+| Mock API: the 4 endpoints, `dayOffset` turned into dates at startup, realistic latency | ✅ | Under `/api/booking` (Task 1 already owns `/api/providers`). Plus a list of providers and a 90-day availability summary; see [How it's put together](#how-its-put-together-task-3). |
+| 409 on demand, latency and failures on demand | ✅ | Mock API panel scenarios, including a `raced` rule where someone else really does take the slot first. See [Trying the failure cases](#trying-the-failure-cases-task-3). |
+| Every `timezone` value handled; a fallback to the country | ✅ | See [Time zones](#time-zones). |
+| Calendar for 90 days; past, closed and full days visibly unavailable, with the reason | ✅ | A word in each cell, the full sentence on selection and in its accessible name. |
+| Two clocks, never confusing | ✅ | See [The two clocks](#the-two-clocks). |
+| Slots grouped; booked slots visible but not selectable | ✅ | Morning, afternoon, evening, by the provider's clock. |
+| Today's started slots unavailable, by the provider's clock | ✅ | Re-checked every 15 s while the page is open. |
+| Specialists narrow the slots; hours outside opening hours explained | ✅ | |
+| Group bookings: N consecutive free slots | ✅ | Buffers included; see [Slots and groups](#slots-and-groups). |
+| 409: keep everything, explain, offer the closest alternatives | ✅ | |
+| Reschedule with an unmistakable old → new | ✅ | |
+| Skeletons, not spinners, for the calendar and slots | ✅ | |
+| A day with no slots, or no availability in 90 days: explain and offer a way forward | ✅ | The data never has the second case; the Mock API panel can make one. |
+| API failure: retry without losing selections | ✅ | Selections live in the URL. |
+| Slow and offline: never confirm a booking whose result is unknown | ✅ | See [Booking, and results we don't know](#booking-and-results-we-dont-know). |
+| Keyboard and screen readers for the calendar and slots | ◑ | Built in (date-picker grid, radio buttons, labels), checked with scripted key presses only. The accessibility pass was dropped; see [What was left out](#what-was-left-out-task-3). |
+| Unit tests for the time-zone and slot logic, including the awkward cases | ✅ | 335 tests added; see [Tests](#tests-task-3). |
+
+## How it's put together (Task 3)
+
+**One copy of the time logic, shared by server and client.** The server needs it to date the data and to check bookings; the client needs it for "now at the provider", the two clocks and the consecutive-slot rules. Both import `shared/`, a dependency-free TypeScript package with its own tests:
+
+- `shared/time/`: reading a provider's `timezone`; converting the provider's wall-clock times to real moments and back; dates without a zone.
+- `shared/booking/`: reading opening and consultation hours defensively; the slot rule; runs of free slots for groups; each day's status and reason; nearest alternatives.
+
+Because the server now compiles `../shared`, its build output moved to `dist/server/src/` (`npm start` points there).
+
+**No date library.** Everything is built on `Intl`, which both Node and browsers have. A library such as the Temporal polyfill would have worked, but the job here is narrow (offsets, wall-clock ↔ moment) and the tricky parts are in the data, not the arithmetic. The code is small enough to test exhaustively and to explain line by line.
+
+**Two endpoints beyond the brief:**
+- `GET /providers` lists providers, so there's somewhere to start, and so the five other time-zone formats can be seen.
+- `GET /providers/:id/availability?specialistId&numberOfPeople` returns each of the 90 days with its status and reason. Without it the calendar would need 90 slot requests.
+
+`POST /bookings` also takes an optional `idempotencyKey`, and conflicts carry `details.alternatives`. Full API: [server/README.md](server/README.md#booking-endpoints-task-3).
+
+**Where each piece of state lives:**
+
+| State | Where | Why there |
+| --- | --- | --- |
+| Providers, availability, a day's slots, a booking | TanStack Query cache, normalised | Server data. Availability and slots share a key prefix per provider, so any booking change refreshes both. The availability key includes the provider's date, so the calendar reloads itself at midnight there. |
+| Specialist, number of people, date, time | The URL (`?specialist=&people=&date=&time=`) | A retry, reload or shared link keeps the customer's choices. Choices replace the history entry, so Back leaves the page. |
+| A booking attempt: its key and whether its result is known | A reducer (`client/src/domain/booking/submission.ts`) + `localStorage` | Must survive a reload: an attempt that may have reached the server is resent, never forgotten. |
+| The customer's time zone | The device's, or the dev panel's override in `localStorage` | Read through `useSyncExternalStore`, so every page updates when it changes. |
+| The calendar's focused day and month | Component state | Only the calendar needs it. |
+
+The rules are pure functions (`shared/`, `client/src/domain/booking/`); components only display them.
+
+## Time zones
+
+`resolveProviderTimeZone` (`shared/time/resolveTimeZone.ts`) reads a provider's `timezone` in this order:
+
+1. **An IANA name**, trimmed and with its case fixed. Old spellings are mapped to current ones (`Asia/Katmandu` → `Asia/Kathmandu`, `Asia/Calcutta` → `Asia/Kolkata`).
+2. **A Windows zone name**, from a small table for MedEx's region (`Nepal Standard Time`, `India Standard Time`, `SE Asia Standard Time`, …).
+3. **A UTC offset** in any of the formats seen (`UTC+05:45`, `(GMT+5:45)`, `+0545`, `(UTC+05:45) Kathmandu`). An offset that matches the country's zone becomes that zone, so customers see "Kathmandu", not "UTC+5:45". One that doesn't match is kept as stated.
+4. **The provider's country** (TH, NP, IN: each has one zone and no daylight saving).
+5. **Nothing**: the provider is shown, but "Online booking isn't available here". A guessed zone would put customers at the clinic at the wrong hour.
+
+Every value in the data is in the [table below](#known-data-issues-task-3).
+
+**Three things `Intl` does that the code works around:**
+- It reports old names (`Asia/Katmandu`, `Asia/Calcutta`) even when given current ones, so names shown to customers come from our own table.
+- It quietly accepts abbreviations: `"IST"` becomes Kolkata (IST is also Israel and Ireland), `"EST"` becomes Panama. Names without a `/` other than UTC and GMT are therefore not trusted.
+- It accepts offset ids such as `"+05:45"` only in newer engines, so fixed offsets are computed by hand.
+
+**Wall-clock times to moments** (`shared/time/zone.ts`): none of the providers' zones have daylight saving, but the conversion handles it anyway (tested with New York). A time that happens twice when clocks go back is read as the first one; a time skipped when they go forward is read as just after the gap.
+
+**The customer's zone** comes from the device, through the same name handling (a Kathmandu device reports `Asia/Katmandu`). If it can't be named, the device's current offset is used.
+
+## The two clocks
+
+The brief's question was "which time is the appointment, mine or theirs?" The answer is on screen before any time is:
+
+- **A box at the top:** "Times are shown in Bangkok time. That's where your appointment is. Your own time (Kathmandu) is shown under each time, in grey. Bangkok is 1 hour 15 minutes ahead of you." Below it, both clocks, live, each with its date when the two dates differ.
+- **One visual rule everywhere after that:** the provider's time is bold; the customer's is smaller, grey and always followed by "your time". Screen readers hear "10:40 AM Bangkok time, 9:25 AM your time".
+- **The customer's date appears whenever it isn't the provider's:** Dr. Mehra's 11:00 PM in India reads "12:30 AM, Tue, Nov 3 your time" for a customer in Bangkok.
+- **The review and confirmation** label each line: "When, in Bangkok" and "Your time (Kathmandu)".
+- **One clock when one is enough:** a Kathmandu customer booking a Kathmandu clinic sees "All times are in Kathmandu time, the same as your own clock."
+- **Times follow the customer's own style** (6:40 PM or 18:40), from their browser's locale. The data's `HH:MM` is never shown raw.
+
+## Dates, and "today" at the provider
+
+- **`dayOffset` counts from today at each provider**, so the server turns it into a date on that provider's own calendar when it starts. At 00:30 in Bangkok, Riverside's day 0 is the 28th while Himal Neo's (Kathmandu) is still the 27th. Tested.
+- **The calendar is the provider's calendar.** When the customer's date differs, the page says so: "Dates follow the calendar in Bangkok. It's already Wednesday, 28 October there."
+- **"Already started" is measured on the provider's clock:** a slot's start is converted to a real moment and compared with now, whatever the customer's device thinks the date is.
+- **Midnight while the page is open:** the browser works out "today at the provider" itself, so yesterday turns grey at midnight there without waiting for the server, and the calendar reloads.
+- **The 90 days are today plus the next 89**, at the provider.
+- **The server dates the data once, at startup.** If it runs past midnight at a provider, the data's days don't move. A real API has real dates; this only affects the mock.
+
+## Slots and groups
+
+`shared/booking/slots.ts`:
+
+- **The slot rule, as the brief states it:** slots start at the start of consultation hours and repeat every duration + buffer. The last slot is the last one that ends (by duration) by the end of those hours.
+- **The buffer after the last slot doesn't need to fit.** Dr. V. Mehra's 11:00 PM slot ends at 11:25 PM; its buffer would run to 11:30 PM, the end of his hours. It's offered.
+- **A slot is offered only if it fits entirely inside the opening hours.** A last slot that ends exactly at closing time is offered (Dr. M. Thapa's 10:00–10:30 PM at a clinic that closes at 10:30 PM).
+- **When opening hours cut a specialist's hours, the customer is told why:** "Dr. N. Rana's hours run to 9:00 PM, but Riverside International Hospital closes at 8:00 PM on Mondays, so the last time is 7:40 PM." When they cut all of them, the day is *Off*: "…closes at 5:00 PM on Fridays, before Dr. N. Rana's hours start at 6:00 PM."
+- **A booking holds the doctor for duration + buffer from its start**, and so does each slot. Comparing them that way, a booked time that isn't on the slot grid (10:30 on a 10:00, 10:40 grid) blocks every slot it overlaps instead of matching none. The data has no such times; the rule is tested anyway.
+- **Groups need N slots in a row:** each must start exactly one step (duration + buffer) after the one before, and all must be free and not started. With Dr. Wongsakul (30 + 10 min), 3 people from 10:00 take 10:00, 10:40 and 11:20 and end at 11:50. A gap in the list breaks a run. Only start times with room for the group are offered; other free slots say "No room for 3".
+- **A day's status** is one of available, past, outside the window, closed that weekday, a one-off closure (with the provider's reason), specialist off, fully booked, no time left today, or not enough slots in a row. Checked in that order, so a holiday reads as a holiday, not as "fully booked".
+
+## The calendar and the day's times
+
+- **Calendar:** one month at a time, Sunday first (the usual week in Thailand, Nepal and India). Each unavailable day has a word in its cell (Closed, Off, Full, Ended, Too few), explained in a legend. Every day in the window can be chosen, even an unavailable one: the panel beside it then says why and offers the nearest bookable days either side. That's the brief's "way forward".
+- **Keyboard:** the standard date-picker grid. One day is in the tab order; arrows move by day and week, Home/End to the week's start and end, PageUp/PageDown by month, all kept inside the 90 days.
+- **The day's times** are native radio buttons in morning, afternoon and evening groups: one tab stop, arrows skip times that can't be chosen. They refresh every 30 s, and if the chosen time is taken or starts meanwhile, the customer is told.
+- **A specialist with nothing in 90 days** gets a plain statement and buttons for the other specialists, or "Look for 1 person instead" for a group.
+
+## Booking, and results we don't know
+
+The rule that matters: **once a request may have reached the server, nothing else can be booked from the page until we know what happened to it.** Otherwise a customer who saw an error and tried again could end up with two appointments.
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> submitting: Confirm (new key)
+    submitting --> booked: 201
+    submitting --> conflict: 409 slot_taken / slot_unavailable
+    submitting --> failed: offline before sending / other 4xx
+    submitting --> unknown: no response / 5xx / 20 s timeout / unreadable reply
+    unknown --> submitting: Check now, reconnect, or reload (SAME key)
+    conflict --> submitting: Confirm another time (new key)
+    failed --> submitting: Confirm again (new key)
+    booked --> [*]
+```
+
+- **Every booking carries an idempotency key.** The server returns the same booking for the same key and request, so resending is always safe.
+- **Unknown results take over the page:** "We're not sure your booking went through yet", the booking being checked, and **Check now**. Every other choice is locked (`inert`). The attempt is saved to `localStorage` before it's sent, and resent with the same key on reconnect and after a reload. Tested by losing the response on purpose and by reloading mid-request: one booking each time.
+- **A resend that finds the browser offline stays unknown.** That try never left, but an earlier one may have arrived.
+- **Slow:** after 3 s, "Still booking. This is taking longer than usual, so please keep this page open." After 20 s the request is given up on, and the result is treated as unknown, never as failed.
+- **Offline:** Confirm is disabled, with the reason.
+- **Someone else got there first (409):** "Someone else booked 12:40 PM a moment before you. Nothing was booked." Specialist, group and date are kept; the calendar and times refresh; the server's three nearest bookable times are offered, each on both clocks. Choosing one updates the review; it doesn't book by itself.
+- **Success** opens the booking's own page (`/bookings/:id`), read back from the server.
+
+## Rescheduling
+
+`/bookings/:id/reschedule`, reached from a booking's page, or from **Manage a booking** on `/book` (there are no accounts, so a reference is the way in):
+
+- **Only the date and time can change**, because `PUT /bookings/:id` only takes those. The specialist and group stay; the calendar opens on the booking's current day.
+- **The booking's own slots count as free** for itself, so a group can move by one slot. Its current time shows as "Your booking now" and can't be chosen.
+- **Old → new before confirming:** a headline ("12 days later", "Same day, 40 minutes later"), then the current booking struck through beside the new one, each on both clocks, and "Your current time is given up only once the change is confirmed."
+- **The same safety as booking:** the same state machine (a `PUT` is safe to repeat). A conflict says "Your booking hasn't changed: it's still Friday, 30 October, 11:20 AM Bangkok time."
+- **Afterwards:** "Your booking has moved", with where it was, struck through.
+
+## Phones and tablets
+
+Checked at 320 px, 390 px, 768 px and desktop, with no horizontal scrolling at any width:
+
+- One column below 1024 px: calendar, then the day's times, then the review.
+- **Choosing a date scrolls to its times**, which are otherwise a screen below the calendar (smoothly, unless the customer prefers reduced motion).
+- **Once a time is chosen, a bar at the bottom** keeps "10:00 AM Bangkok time · Wed, Nov 11" and a **Review** button in view until the review scrolls into sight.
+- Calendar cells fit 7 across at 320 px with their words; times are 2 per row on phones, 3–4 on wider screens; the old → new cards stack with a downward arrow.
+- The header's Cart and Appointments links, and the Mock API button, shrink to icons on phones (they keep their accessible names).
+
+## Trying the failure cases (Task 3)
+
+The **Mock API** panel (bottom-left) has a *Booking* group of one-click scenarios:
+
+- next booking, or next reschedule: someone else takes the slot first (a real 409 with alternatives);
+- next booking: made, then the connection drops / a 500 (result unknown);
+- next booking takes 8 s;
+- loading the calendar, or a day's times, fails until cleared;
+- booking pages slow (+4 s) until cleared, for the skeletons and slow messages;
+- Dr. N. Rana fully booked for all 90 days (the data never leaves a specialist with no availability).
+
+**Your time zone** shows "your time" as if the device were elsewhere: the three markets, London, New York, Auckland (a different date from Bangkok most of the day) and Honolulu. It's saved per browser. For offline, use the browser's network tools.
+
+## Decisions on what the brief left open (Task 3)
+
+| Question | Decision | Why |
+| --- | --- | --- |
+| Must the customer choose a specialist? | Yes, unless only one can be booked. | "Any specialist" would make a group booking quietly pick one doctor for them. |
+| Does the buffer after the last slot have to fit? | No: a slot only has to end by the end of the hours. | The brief's rule says the last slot "still ends by" the end time. |
+| How long does a booking hold the doctor? | Duration + buffer from its start. | So off-grid booked times block what they overlap; on-grid ones behave exactly as before. |
+| A closure on a day with bookings in the data | The closure wins. | The day can't happen as booked. Listed under [data issues](#needs-fixing-at-the-source-1). |
+| The existing booking isn't in `bookedSlots` | The server counts it as taken. | Otherwise someone else could book its slot. |
+| Which days are in "the next 90 days"? | Today and the following 89, at the provider. | |
+| Which day starts the week? | Sunday. | The usual start in Thailand, Nepal and India. |
+| How far apart are the "closest alternatives"? | The 3 bookable start times nearest in real time, up to 3 days either side. | Real time, so 12:30 AM tomorrow counts as close to 11:00 PM tonight. |
+| Is a 500 on booking a failure? | No: the result is unknown. | The booking may have been made before the error. |
+| Can a reschedule change the specialist or group? | No. | `PUT` only takes a date and time. |
+
+## Known data issues (Task 3)
+
+What `server/data/task3-booking.json` contains: 6 providers, 8 specialists, 2 closures, 613 booked slots and one existing booking. The client and server never edit the source data.
+
+### Time zones, one format per provider
+
+| Provider | Raw `timezone` | Read as | How |
+| --- | --- | --- | --- |
+| Riverside International Hospital (TH) | `"Asia/Bangkok"` | Asia/Bangkok (UTC+7) | A valid IANA name |
+| Himal Neo Clinic (NP) | `" UTC+05:45"` | Asia/Kathmandu | Trimmed and parsed as an offset. The offset matches Nepal's zone, so the provider gets Nepal's name rather than a bare offset. |
+| Annapurna Diagnostics (NP) | `"Nepal Standard Time"` | Asia/Kathmandu | A Windows zone name, looked up in a small Windows→IANA table |
+| Pashupati Medical Centre (NP) | `"(GMT+5:45)"` | Asia/Kathmandu | Brackets stripped, single-digit hour accepted, then as above |
+| Lumbini Polyclinic (NP) | `"Asia/Katmandu "` | Asia/Kathmandu | Trimmed. `Katmandu` is the old spelling of the IANA name, mapped to the current one |
+| Aravali Hospital (IN) | `""` | Asia/Kolkata (UTC+5:30) | Empty, so it falls back to the provider's country |
+
+### Needs fixing at the source
+
+| Issue | Example | What the app does | Suggested next step |
+| --- | --- | --- | --- |
+| Booked slots on a closure day | Riverside has 4 bookings on its public holiday (day 12), Himal Neo has 10 on its staff training day (day 4) | The closure wins: the day is closed and shows the closure's reason. | Find and contact those customers. Adding a closure should flag existing bookings on that day. |
+| Booked slots outside the provider's opening hours | Dr. P. Chaiyaporn has bookings at 07:00, but Riverside opens at 08:00. Dr. N. Rana has bookings at 20:00–20:40, but Riverside closes at 20:00. | These slots are never offered, so the bookings change nothing the customer sees. | Same as above: these bookings can't take place as recorded. |
+| The existing booking isn't in `bookedSlots` | `BK-20261008-0042`, Dr. A. Wongsakul, day 3 at 11:20 | The mock API counts it as taken at startup, so nobody else can book that slot. During a reschedule it's shown as "your current booking" and counts as free for the booking being moved. | Keep the bookings list and the slot list in one source. |
+| The booking id carries a date | `BK-20261008-…` | Ignored. The real date comes from `dayOffset`. | None. Ids shouldn't be read for meaning. |
+
+### Handled by design
+
+| Situation | What the app does |
+| --- | --- |
+| Specialists' hours that go past the provider's opening hours. Dr. P. Chaiyaporn works 07:00–12:00, Riverside opens at 08:00 (09:00 on Saturday). Dr. N. Rana works 18:00–21:00, Riverside closes at 20:00 Monday–Thursday and 17:00 on Friday. | Only slots inside the opening hours are offered. The day's times explain the missing hours: "Dr. N. Rana's hours run to 9:00 PM, but Riverside International Hospital closes at 8:00 PM on Mondays, so the last time is 7:40 PM." On Fridays and Saturdays Dr. Rana has no slots at all: the calendar marks those days *Off* and says why. |
+| Late-evening slots. Dr. V. Mehra (Aravali, India) has slots up to 23:00–23:25. | At 23:00 in India it's already the next day in Bangkok, and 23:15 in Kathmandu. The customer's time shows its own date whenever the date differs from the provider's. |
+| A last slot that ends exactly at closing. Dr. M. Thapa's 22:00–22:30 slot at Lumbini, which closes at 22:30. | Offered. A slot only has to end by closing time, and the buffer after the last slot doesn't count. |
+| A fully booked day. Dr. A. Wongsakul on day 5. | The calendar marks it *Full* (unless it falls on a closed day), and choosing it offers the nearest bookable days. |
+| Booked slots only cover days 0–29 | Days 30–89 are open wherever the provider and specialist work. |
+
+The data doesn't contain malformed times, durations of zero or less, unknown specialists, duplicate bookings or off-grid booked times. The parsing code guards against them anyway and has tests for them, because the providers type this data in by hand.
+
+## Tests (Task 3)
+
+`npm test` now runs **719 tests**: 135 in `shared/`, 66 on the server and 518 in the client. Task 3 added 335 of them. They run in Node with Vitest, many against the real `task3-booking.json`.
+
+- **Time zones (`shared/time`):** every `timezone` value in the data file; old spellings, case, extra spaces, Windows names in both forms, every offset format; abbreviations that `Intl` would wrongly accept; impossible offsets; missing values falling back to the country, and giving up when the country is unknown too. Offsets of the three markets; today at the provider differing from the customer's; midnight at the provider; wall-clock ↔ moment round trips; daylight-saving gaps and overlaps; dates across months, years and leap days.
+- **Slots (`shared/booking`):** the brief's own example (10:00, 10:40, 11:20…); the last slot ending exactly at the end; the buffer after the last slot; Dr. Rana on a Monday (cut at 8 PM) and a Friday (none); Dr. Chaiyaporn on a Saturday (cut before 9 AM); off-grid and out-of-hours bookings; groups across buffers, at the end of the day, broken by a gap, and during a reschedule; every day status and its order; day 89 vs day 90; nearest alternatives across midnight; unreadable hours, including a duration of 0.
+- **Server:** dates from `dayOffset` per provider (including when the providers' "today" differ); broken records skipped and reported; bookings, groups, idempotency, conflicts with alternatives, started slots, closures, rescheduling onto its own slots, someone else taking the slot first, a fully booked specialist.
+- **Client domain:** normalising every raw record defensively; the URL selection; the calendar's months and keys; slot states for both clocks; the old → new headline; the submission state machine and its error classification, including "offline on a resend stays unknown"; saving attempts.
+- **Components:** rendered to static HTML and checked for wording on both clocks, reasons, states and attributes. Times are formatted with the same functions the app uses, so the tests pass in any locale.
+
+### Checked in a real browser
+
+Driven in headless Edge through the DevTools protocol against the real server, with the customer's time zone emulated (Kathmandu, Bangkok, Auckland). The scripts aren't in the repo.
+
+- The calendar's keys: arrows, Home/End, PageUp/PageDown, stopping at the window's edges, one tab stop, Enter choosing.
+- The time slots: arrow keys skipping booked times and wrapping; the accessible name of each time.
+- Booking: a normal booking; someone else taking the slot first, then choosing an alternative; the response lost after the booking was made, then **Check now** returning the same booking; a reload while the result was unknown, resending by itself. The server ended with one booking per attempt.
+- Rescheduling: the current slot marked and disabled, a same-day and a 12-day move, a conflict leaving the booking where it was.
+- The dev panel's time zone override and the fully booked scenario.
+- Layouts at 320, 390, 768 and 1280 px, with no horizontal scrolling; the scroll to a day's times and the bottom bar on a phone.
+
+## What was left out (Task 3)
+
+**The accessibility pass was dropped** to make time for this README. What's in place was built in, not audited:
+
+- The calendar follows the date-picker grid pattern, the times and pickers are native radio buttons, every unavailable day and time has its reason in its accessible name, and loading, errors and conflicts are announced.
+- Not done: a keyboard-only or screen-reader walkthrough (VoiceOver, NVDA), automated axe checks, and measuring the contrast of the amber and emerald status colours and the greyed-out days and times.
+- Known gap: after choosing a date, focus stays on the calendar. Keyboard users reach the times with Tab, but nothing announces that they've appeared below (the count of times available is announced).
+
+**Other things left out, and what I'd do next:**
+
+- **Interaction tests in the repo.** The browser checks were scripts run during development. Next: Playwright tests for the conflict, lost-response and reload cases.
+- **Payment and patient details.** Booking needs no name, contact or payment here.
+- **A list of the customer's bookings.** There's no endpoint for it; bookings are found by reference.
+- **Cancelling a booking.** Not in the brief's API.
+- **The server dates the data once.** If it runs past midnight at a provider, the data's days don't move with it.
+- **Two tabs aren't synchronised.** Each tab runs its own attempt; the idempotency key still prevents a double booking.
+- **More Windows zone names.** The table covers MedEx's region only; any other name falls back to the country.
+- **Daylight saving is handled but never exercised by the data**, since none of the three markets has it. Tested with New York only.
+- **The dev panel ships in every build**, collapsed, so reviewers can use it on a deployed copy. In a real product it would be behind a development flag.
+
+## Where AI tools were used (Task 3)
+
+Built with Claude Code (Anthropic) as a pair programmer in VS Code, as for Tasks 1 and 2:
+
+- **Analysis and plan:** Claude read the brief and audited the data file (every time-zone value, every booked slot), listed the edge cases and open questions, and proposed a 13-step plan. The developer made the decisions, including: requiring a specialist; adding the availability endpoint; sharing the time and slot logic between server and client; writing it on `Intl` rather than a date library; dropping the accessibility pass.
+- **Code and tests:** Claude wrote them one step at a time. The developer reviewed each step and made every commit.
+- **Browser checks:** Claude wrote and ran the headless Edge scripts described above and reported what it saw, including the bugs they caught (a misleading "someone has just booked" while a booking's result was unknown; two clocks run together in one accessible name; the header overflowing at 320 px).
 - **This README:** drafted by Claude.

@@ -1,4 +1,4 @@
-import { ShoppingCart } from 'lucide-react'
+import { CalendarDays, ShoppingCart } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { LogInButton } from '@/components/account/LogInButton'
@@ -35,11 +35,11 @@ export function AppLayout() {
   return (
     <div className="min-h-svh bg-background">
       <header className="border-b">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
           <Link to="/" className="rounded-sm font-accent text-xl font-semibold tracking-tight outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
             medex
           </Link>
-          <nav aria-label="Main" className="flex items-center gap-2">
+          <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2">
             {account === 'guest' ? (
               <LogInButton size="sm" variant="ghost" />
             ) : (
@@ -48,16 +48,28 @@ export function AppLayout() {
               </Button>
             )}
             <NavLink
+              to="/book"
+              className={({ isActive }) =>
+                cn(
+                  'inline-flex h-9 items-center gap-2 rounded-full px-3 font-accent text-sm font-medium outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-4',
+                  isActive && 'bg-accent',
+                )
+              }
+            >
+              <CalendarDays aria-hidden className="size-4" />
+              <span className="sr-only sm:not-sr-only">Appointments</span>
+            </NavLink>
+            <NavLink
               to="/cart"
               className={({ isActive }) =>
                 cn(
-                  'inline-flex h-9 items-center gap-2 rounded-full px-4 font-accent text-sm font-medium outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  'inline-flex h-9 items-center gap-2 rounded-full px-3 font-accent text-sm font-medium outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-4',
                   isActive && 'bg-accent',
                 )
               }
             >
               <ShoppingCart aria-hidden className="size-4" />
-              Cart
+              <span className="sr-only sm:not-sr-only">Cart</span>
               {cartCount !== undefined && cartCount > 0 && (
                 <span className="rounded-full bg-primary px-1.5 text-xs leading-5 text-primary-foreground tabular-nums">
                   {cartCount}

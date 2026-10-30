@@ -1,11 +1,11 @@
-import { Router, type Request, type Response } from 'express'
+import { Router } from 'express'
 import type { CartStore } from './cart/cartStore.js'
 import { ApiError } from './cart/errors.js'
 import { mergeGuestCart } from './cart/merge.js'
 import type { CheckoutItem, CheckoutRequest, OrderService } from './cart/orders.js'
 import type { GuestCartItem, PaymentMethod, Product } from './cart/types.js'
 import { mockNetwork } from './mock.js'
-import { parseMockConfig, sendInjectedFailure, type MockRules } from './mockRules.js'
+import { parseMockConfig, send, type MockRules } from './mockRules.js'
 
 interface CartRouterDeps {
   cart: CartStore
@@ -21,17 +21,6 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const isPositiveInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1
 
 const badRequest = (message: string) => new ApiError(400, 'invalid_request', message)
-
-/**
- * Sends a success response, unless a mock rule asked for this request to fail
- * after its work was done (see MockRules).
- */
-function send(req: Request, res: Response, status: number, body?: unknown) {
-  const failAfter = res.locals.failAfter as number | undefined
-  if (failAfter !== undefined) return sendInjectedFailure(req, res, failAfter)
-  if (body === undefined) res.status(status).end()
-  else res.status(status).json(body)
-}
 
 function parseCheckout(body: unknown): CheckoutRequest {
   if (!isObject(body)) throw badRequest('Expected a JSON object')
@@ -126,13 +115,6 @@ export function createCartRouter({ cart, orders, rules, catalog, guestCart }: Ca
     if (typeof config === 'string') throw badRequest(config)
     rules.set(config)
     res.json(rules.current)
-  })
-
-  /** Restores the seed cart and forgets all orders. Rules are kept. */
-  router.post('/__mock/reset', (_req, res) => {
-    cart.reset()
-    orders.reset()
-    res.status(204).end()
   })
 
   /** The guest cart from the data file, so the client can seed "this device" with it */

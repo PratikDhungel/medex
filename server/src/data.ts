@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { dataFile } from './paths.js'
 
 // Raw records are passed through untouched; the client normalises them and
 // handles the data's quirks (string money, null wellness prices, hidden rows).
@@ -12,8 +13,7 @@ export interface ServiceExplorerData {
   services: Service[]
 }
 
-// Resolves from src/ (tsx) and dist/ (compiled) alike
-const DATA_FILE = new URL('../data/task1-service-explorer.json', import.meta.url)
+const DATA_FILE = dataFile('task1-service-explorer.json')
 
 export function loadServiceExplorerData(file: URL = DATA_FILE): ServiceExplorerData {
   const raw: unknown = JSON.parse(readFileSync(file, 'utf8'))

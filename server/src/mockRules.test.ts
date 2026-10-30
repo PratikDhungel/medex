@@ -14,9 +14,13 @@ async function run(rules: MockRules, endpoint: 'checkout', body: object) {
 }
 
 describe('parseMockConfig', () => {
-  it('accepts a valid config and fills in the default settlement', () => {
+  it('accepts a valid config and fills in the defaults', () => {
     const config = parseMockConfig({ rules: [{ endpoint: 'checkout', status: 402, times: 1 }] })
-    expect(config).toMatchObject({ rules: [{ endpoint: 'checkout', status: 402, times: 1 }], settlement: { outcome: 'paid' } })
+    expect(config).toMatchObject({
+      rules: [{ endpoint: 'checkout', status: 402, times: 1 }],
+      settlement: { outcome: 'paid' },
+      fullyBookedSpecialists: [],
+    })
   })
 
   it.each([
@@ -25,6 +29,7 @@ describe('parseMockConfig', () => {
     [{ rules: [{ endpoint: 'checkout', status: 200 }] }],
     [{ rules: [{ endpoint: 'checkout', times: 0 }] }],
     [{ rules: [], settlement: { outcome: 'maybe', afterMs: 0 } }],
+    [{ rules: [], fullyBookedSpecialists: 'everyone' }],
   ])('rejects %j', (body) => {
     expect(typeof parseMockConfig(body)).toBe('string')
   })
@@ -45,5 +50,24 @@ describe('MockRules', () => {
     const rules = new MockRules()
     rules.set({ rules: [{ endpoint: 'checkout', status: 500, when: 'after' }], settlement } as MockConfig)
     expect(await run(rules, 'checkout', {})).toEqual({ passed: true, status: undefined, failAfter: 500 })
+  })
+})
+
+describe('raced rules', () => {
+  it('are only allowed where a slot can be taken', () => {
+    expect(parseMockConfig({ rules: [{ endpoint: 'createBooking', when: 'raced', times: 1 }] })).toMatchObject({
+      rules: [{ endpoint: 'createBooking', when: 'raced' }],
+    })
+    expect(typeof parseMockConfig({ rules: [{ endpoint: 'checkout', when: 'raced' }] })).toBe('string')
+  })
+
+  it('let the request through with res.locals.raced set, for the route to act on', async () => {
+    const rules = new MockRules()
+    rules.set({ rules: [{ endpoint: 'createBooking', when: 'raced', times: 1 }], settlement } as MockConfig)
+    const res = { locals: {} as Record<string, unknown> }
+    const next = vi.fn()
+    await rules.middleware('createBooking')({ body: {}, params: {} } as unknown as Request, res as unknown as Response, next)
+    expect(next).toHaveBeenCalledOnce()
+    expect(res.locals.raced).toBe(true)
   })
 })
